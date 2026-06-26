@@ -105,8 +105,11 @@ def generic_fetch():
         timeout = current_app.config.get('PROXY_FETCH_TIMEOUT', 15)
         
         req_kwargs = {'timeout': timeout}
-        if body:
-            req_kwargs['json'] = body
+        if body is not None:
+            if headers.get('Content-Type') == 'text/plain':
+                req_kwargs['data'] = body.encode('utf-8') if isinstance(body, str) else body
+            else:
+                req_kwargs['json'] = body
         if headers:
             req_kwargs['headers'] = headers
             

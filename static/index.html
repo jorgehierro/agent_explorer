@@ -203,8 +203,11 @@
 <!-- PLAYBOOK MODAL -->
 <div class="modal-overlay" id="playbook-modal">
   <div class="modal wide pb-flow-modal">
-    <h2 id="pb-modal-title"><i class="ti ti-route"></i> Playbooks</h2>
-    <div class="pb-tabs">
+    <div style="display:flex; justify-content:space-between; align-items:center; padding-right:18px;">
+      <h2 id="pb-modal-title" style="margin-bottom:0;"><i class="ti ti-route"></i> Playbooks</h2>
+      <button class="pb-mini-btn" style="margin-top:10px;" onclick="document.getElementById('playbook-modal').classList.remove('open')"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="pb-tabs" style="margin-top:10px;">
       <button class="pb-tab active" id="pb-btn-run" onclick="switchPbTab('run')"><i class="ti ti-player-play"></i> Ejecutar</button>
       <button class="pb-tab" id="pb-btn-create" onclick="switchPbTab('create')"><i class="ti ti-pencil"></i> Diseñador</button>
     </div>

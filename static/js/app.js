@@ -731,6 +731,13 @@ function openPlaybookModal() {
   document.getElementById('pb-modal-title').innerHTML = kind === 'workflow' ? '<i class="ti ti-route"></i> Workflows' : '<i class="ti ti-list-check"></i> Playbooks';
   document.getElementById('pb-btn-run').innerHTML = '<i class="ti ti-player-play"></i> Ejecutar';
   document.getElementById('pb-btn-create').innerHTML = '<i class="ti ti-pencil"></i> Diseñador';
+  
+  if (kind === 'workflow') {
+    document.getElementById('pb-btn-create').style.display = 'none';
+  } else {
+    document.getElementById('pb-btn-create').style.display = 'block';
+  }
+  
   document.getElementById('playbook-modal').classList.add('open');
   switchPbTab('run');
 }
@@ -1003,21 +1010,41 @@ async function pbRefreshList() {
   list.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text3)"><i class="ti ti-loader-2" style="animation:spin 1s linear infinite;font-size:24px"></i></div>';
   try {
     const a = agents[selected];
-    const urlPath = selectedAgentKind() === 'workflow' ? '/workflows' : '/playbooks';
+    const isWorkflow = selectedAgentKind() === 'workflow';
+    const urlPath = isWorkflow ? '/workflows' : '/playbooks';
     const r = await fetch('/api/proxy/fetch', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ url: a.url + urlPath, method: 'GET' }) });
+    
     if (r.ok) {
       const data = await r.json();
-      const pbs = selectedAgentKind() === 'workflow' ? data.workflows : data.playbooks;
-      if (!pbs || !pbs.length) { list.innerHTML = `<div class="empty-state"><i class="ti ti-list-search"></i><p>No hay ${urlPath.substring(1)} desplegados.</p></div>`; return; }
-      list.innerHTML = pbs.map(p => `
+      const keys = Array.isArray(data) ? data : Object.keys(data || {});
+      
+      if (!keys.length) { 
+        list.innerHTML = `<div class="empty-state"><i class="ti ti-list-search" style="font-size:24px; color:var(--text3); margin-bottom:8px; display:block;"></i><p>No hay ${urlPath.substring(1)} desplegados.</p></div>`; 
+        return; 
+      }
+      
+      list.innerHTML = keys.map(k => {
+        const meta = Array.isArray(data) ? {} : (data[k] || {});
+        const jsKey = escapeJsString(k);
+        const displayName = escapeHtml(meta.name || k);
+        const descText = meta.description || (isWorkflow && meta.module ? ('Módulo: ' + meta.module) : 'Sin descripción');
+        const stepsText = isWorkflow ? 'workflow' : `${Number(meta.steps || 0)} pasos`;
+        
+        return `
         <div class="playbook-item">
-          <div class="pb-run-area" onclick="pbOpenInputModal('${p.name}')">
-            <div class="pb-run-main"><div class="pb-name"><i class="ti ti-player-play-filled" style="color:var(--blue-text);font-size:10px;margin-right:4px"></i> ${p.name}</div><div class="pb-desc">${p.description || 'Sin descripción'}</div></div>
-            <div class="pb-steps">${(p.steps || []).length} pasos</div>
+          <div class="pb-run-area" onclick="pbOpenInputModal('${jsKey}')" title="Ejecutar">
+            <div class="pb-run-main">
+              <div class="pb-name"><i class="ti ti-player-play-filled" style="color:var(--blue-text);font-size:10px;margin-right:4px"></i> ${displayName}</div>
+              <div class="pb-desc">${escapeHtml(descText)}</div>
+            </div>
+            <div class="pb-steps">${stepsText}</div>
           </div>
-          <button class="pb-del-btn" onclick="pbAskDelete('${p.name}')" title="Eliminar"><i class="ti ti-trash"></i></button>
+          ${!isWorkflow ? `<button class="pb-del-btn" onclick="pbAskDelete('${jsKey}')" title="Eliminar"><i class="ti ti-trash"></i></button>` : ''}
         </div>
-      `).join('');
+        `;
+      }).join('');
+    } else {
+      list.innerHTML = `<div style="color:var(--red);text-align:center;padding:20px">Error al cargar la lista</div>`;
     }
   } catch(e) { list.innerHTML = `<div style="color:var(--red);text-align:center;padding:20px">Error de conexión</div>`; }
 }
