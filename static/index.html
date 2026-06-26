@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Agent Explorer</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+
+<!-- TOAST CONTAINER -->
+<div class="toast-container" id="toast-container"></div>
+
+<!-- LOGIN OVERLAY -->
+<div class="login-overlay" id="login-overlay">
+  <div class="login-card">
+    <h2><i class="ti ti-topology-star-3"></i> Agent Explorer</h2>
+    <div class="login-field">
+      <label>Usuario</label>
+      <input type="text" id="login-username" placeholder="admin" onkeydown="if(event.key==='Enter') document.getElementById('login-password').focus()" />
+    </div>
+    <div class="login-field">
+      <label>Contraseña</label>
+      <input type="password" id="login-password" placeholder="••••••••" onkeydown="if(event.key==='Enter') doLogin()" />
+    </div>
+    <div class="login-error" id="login-error"></div>
+    <button class="btn primary login-btn" onclick="doLogin()" id="login-btn">
+      <i class="ti ti-login"></i> Iniciar Sesión
+    </button>
+  </div>
+</div>
+
+<header>
+  <h1><i class="ti ti-topology-star-3"></i> Agent Explorer</h1>
+  <div class="discover-form">
+    <input class="url" id="base-url" placeholder="http://10.139.90.120" value="http://10.139.90.120" />
+    <span style="font-size:13px;color:var(--text3)">puertos</span>
+    <input style="width:70px" id="port-from" placeholder="9001" value="9001" />
+    <span style="font-size:13px;color:var(--text3)">—</span>
+    <input style="width:70px" id="port-to" placeholder="9100" value="9100" />
+    <button class="btn" onclick="discoverAgents()" id="discover-btn">
+      <i class="ti ti-radar"></i> Descubrir
+    </button>
+  </div>
+
+  <div style="display:flex;gap:6px;align-items:center">
+    <button class="app-tab-btn active" id="tab-explorer" onclick="switchMainTab('explorer')"><i class="ti ti-message"></i> Explorer</button>
+    <button class="app-tab-btn" id="tab-creator" onclick="switchMainTab('creator')"><i class="ti ti-robot"></i> Creador de agentes</button>
+    <button class="app-tab-btn admin-only" id="tab-admin" onclick="switchMainTab('admin')" style="display:none"><i class="ti ti-shield"></i> Admin</button>
+  </div>
+
+  <!-- USER MENU -->
+  <div class="user-menu-wrap" style="margin-left: 10px;">
+    <div class="user-avatar" id="user-avatar" onclick="toggleUserMenu()">?</div>
+    <div class="user-dropdown" id="user-dropdown">
+      <div class="ud-header">
+        <div class="ud-name" id="ud-name">Usuario</div>
+        <div class="ud-role" id="ud-role">Rol</div>
+      </div>
+      <div class="ud-item" onclick="openPasswordModal()">
+        <i class="ti ti-key"></i> Cambiar contraseña
+      </div>
+      <div class="ud-item danger" onclick="doLogout()">
+        <i class="ti ti-logout"></i> Cerrar sesión
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="main" id="explorer-view">
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <span>Agentes</span>
+      <span id="agent-count" style="font-size:11px;color:var(--text3)"></span>
+    </div>
+    <div class="agents-list" id="agents-list">
+      <div class="empty-state">
+        <i class="ti ti-router"></i>
+        <p>Introduce la URL base y los puertos, luego pulsa <strong>Descubrir</strong>.</p>
+      </div>
+    </div>
+    <div class="sidebar-footer">
+      <button class="add-btn" onclick="openModal()">
+        <i class="ti ti-plus"></i> Añadir manualmente
+      </button>
+    </div>
+  </div>
+
+  <div class="chat-area">
+    <div class="agent-bar" id="agent-bar">
+      <div class="ab-name" id="ab-name"></div>
+      <div class="ab-desc" id="ab-desc"></div>
+      <div id="ab-caps"></div>
+      <div class="status-badge" id="ab-status"></div>
+      <button class="btn" onclick="openPlaybookModal()" title="Automatizaciones" id="automation-btn"><i class="ti ti-list-check" id="automation-btn-icon"></i> <span id="automation-btn-label">Playbooks</span></button>
+      <button class="btn" onclick="clearChat()" title="Limpiar conversación">
+        <i class="ti ti-trash"></i>
+      </button>
+    </div>
+
+    <div class="messages" id="messages">
+      <div class="empty-state" style="flex:1; margin-top: 10vh;">
+        <i class="ti ti-message-dots" style="font-size: 64px;"></i>
+        <h2 style="color:var(--text); font-weight:500; font-size:18px; margin-bottom:8px;">Sin mensajes</h2>
+        <p>Selecciona un agente de la barra lateral para empezar a chatear.</p>
+      </div>
+    </div>
+
+    <div class="extra-fields" id="extra-fields">
+      <div class="extra-fields-toggle" onclick="toggleExtraFields()">
+        <i class="ti ti-chevron-right" id="extra-toggle-icon"></i>
+        <span id="extra-toggle-label">Campos adicionales</span>
+      </div>
+      <div class="extra-fields-body" id="extra-fields-body" style="display:none"></div>
+    </div>
+    <div class="input-bar">
+      <textarea id="msg-input" placeholder="Escribe tu mensaje... (Enter para enviar, Shift+Enter para nueva línea)" rows="1" disabled
+        oninput="autoResize(this)"
+        onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage()}"
+      ></textarea>
+      <button class="btn primary" id="send-btn" onclick="sendMessage()" disabled>
+        <i class="ti ti-send"></i>
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="creator-view" id="agent-creator-view">
+  <section class="ac-panel">
+    <div class="ac-head"><div class="ac-title"><i class="ti ti-forms"></i> Datos del agente</div><button class="btn" onclick="acLoadToolProfiles()"><i class="ti ti-refresh"></i> Perfiles</button></div>
+    <div class="ac-body">
+      <div class="ac-field"><label>Agent Creator URL</label><input id="ac-creator-url" value="http://10.139.90.120:9097" /><small>Servicio backend que crea archivos en el proyecto.</small></div>
+      <div class="ac-field"><label>Nombre del agente</label><input id="ac-agent-name" placeholder="mi_nuevo_agente" oninput="acSyncEnvHint()" /><small>Usa snake_case. Ejemplo: <code>ticket_enricher</code>.</small></div>
+      <div class="ac-field"><label>Descripción</label><input id="ac-description" placeholder="Describe qué hace el agente" /></div>
+      <div class="ac-row"><div class="ac-field"><label>Capabilities</label><input id="ac-capabilities" value="tool_executing, reporting" /></div><div class="ac-field"><label>Puerto</label><input id="ac-port" type="number" min="1" max="65535" placeholder="9020" /></div></div>
+      <div class="ac-field"><label>Variable de puerto</label><input id="ac-env-hint" disabled /></div>
+      <label class="ac-check"><input id="ac-use-tools" type="checkbox" onchange="acToggleTools()" /> Usar tools MCP</label>
+      <div class="ac-field" id="ac-tool-profile-wrap" style="display:none"><label>Perfil de tools</label><div style="display:flex;gap:8px"><select id="ac-tool-profile"><option value="">Cargando perfiles...</option></select><button class="btn" type="button" onclick="acLoadToolProfiles()">Actualizar</button></div></div>
+      <div class="ac-field"><label>Prompt</label><textarea id="ac-prompt" placeholder="Pega aquí el system prompt..."></textarea></div>
+      <label class="ac-check"><input id="ac-overwrite" type="checkbox" /> Sobrescribir si ya existe</label>
+      <div class="ac-actions"><span class="ac-status" id="ac-status">Listo</span><button class="btn" onclick="acPreviewAgent()"><i class="ti ti-eye"></i> Preview</button><button class="btn primary" onclick="acCreateAgent()"><i class="ti ti-sparkles"></i> Crear agente</button></div>
+    </div>
+  </section>
+  <section class="ac-panel"><div class="ac-head"><div class="ac-title"><i class="ti ti-code"></i> Preview de archivos</div></div><div class="ac-tabs" id="ac-tabs"></div><pre class="ac-preview" id="ac-preview">Pulsa Preview para ver los archivos generados.</pre></section>
+</div>
+
+<!-- ADMIN PANEL -->
+<div class="admin-view" id="admin-view">
+  <div class="admin-tabs">
+    <div class="admin-tab active" onclick="switchAdminTab('users')"><i class="ti ti-users"></i> Usuarios</div>
+    <div class="admin-tab" onclick="switchAdminTab('audit')"><i class="ti ti-history"></i> Log de Auditoría</div>
+  </div>
+  
+  <div class="admin-section active" id="admin-users">
+    <div class="admin-toolbar">
+      <button class="btn primary" onclick="openUserModal()"><i class="ti ti-user-plus"></i> Nuevo Usuario</button>
+    </div>
+    <div class="admin-table-wrap">
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th>Usuario</th>
+            <th>Nombre Visible</th>
+            <th>Rol</th>
+            <th>Estado</th>
+            <th>Creación</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="users-tbody">
+          <tr><td colspan="6" style="text-align:center;color:var(--text3)">Cargando usuarios...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="admin-section" id="admin-audit">
+    <div class="admin-toolbar">
+      <button class="btn" onclick="loadAuditLogs()"><i class="ti ti-refresh"></i> Actualizar</button>
+    </div>
+    <div class="admin-table-wrap">
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Usuario</th>
+            <th>Acción</th>
+            <th>Detalle</th>
+            <th>IP</th>
+          </tr>
+        </thead>
+        <tbody id="audit-tbody">
+          <tr><td colspan="5" style="text-align:center;color:var(--text3)">Cargando logs...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- PLAYBOOK MODAL -->
+<div class="modal-overlay" id="playbook-modal">
+  <div class="modal wide pb-flow-modal">
+    <h2 id="pb-modal-title"><i class="ti ti-route"></i> Playbooks</h2>
+    <div class="pb-tabs">
+      <button class="pb-tab active" id="pb-btn-run" onclick="switchPbTab('run')"><i class="ti ti-player-play"></i> Ejecutar</button>
+      <button class="pb-tab" id="pb-btn-create" onclick="switchPbTab('create')"><i class="ti ti-pencil"></i> Diseñador</button>
+    </div>
+
+    <!-- PESTAÑA RUN/MANAGE -->
+    <div class="pb-section active" id="pb-tab-run">
+      <div style="display:flex;gap:8px;margin-bottom:12px;">
+        <button class="btn" onclick="pbRefreshList()"><i class="ti ti-refresh"></i> Refrescar</button>
+        <button class="btn" onclick="pbImportDraft()"><i class="ti ti-file-upload"></i> Cargar Auto-Guardado</button>
+      </div>
+      <div class="playbook-list" id="pb-list"></div>
+    </div>
+
+    <!-- PESTAÑA DISEÑADOR N8N-LIKE -->
+    <div class="pb-section" id="pb-tab-create">
+      <div class="pb-flow-topbar">
+        <input class="pb-flow-input" id="pb-name" placeholder="Nombre (ej. lead_processor)" />
+        <input class="pb-flow-input" id="pb-desc" placeholder="Descripción del playbook" />
+        <div style="display:flex;gap:8px">
+          <button class="btn" onclick="pbClearCanvas()"><i class="ti ti-trash"></i> Limpiar</button>
+          <button class="btn primary" onclick="pbCreatePlaybook()"><i class="ti ti-device-floppy"></i> Desplegar</button>
+        </div>
+      </div>
+      
+      <div class="pb-flow-workbench">
+        <!-- Paleta Agentes -->
+        <div class="pb-flow-panel">
+          <div class="pb-flow-panel-head">
+            <div class="pb-flow-panel-title"><i class="ti ti-components"></i> Agentes Disponibles</div>
+          </div>
+          <input class="pb-agent-search" placeholder="Filtrar..." oninput="pbFilterAgents(this.value)" />
+          <div class="pb-agent-palette" id="pb-agent-palette"></div>
+        </div>
+
+        <!-- Canvas -->
+        <div class="pb-flow-panel" style="flex:1;">
+          <div class="pb-flow-canvas-wrap" ondrop="pbDropCanvas(event)" ondragover="event.preventDefault()">
+            <div class="pb-flow-canvas-toolbar">
+              <button class="pb-mini-btn" onclick="pbAutoLayout()" title="Auto Ordenar"><i class="ti ti-layout-grid-add"></i></button>
+              <button class="pb-mini-btn" onclick="pbClearCanvas()" title="Borrar todo"><i class="ti ti-eraser"></i></button>
+            </div>
+            <div class="pb-flow-canvas-toolbar zoom">
+              <button class="pb-mini-btn" onclick="pbZoom(-0.2)"><i class="ti ti-zoom-out"></i></button>
+              <span class="pb-zoom-indicator" id="pb-zoom-label">100%</span>
+              <button class="pb-mini-btn" onclick="pbZoom(0.2)"><i class="ti ti-zoom-in"></i></button>
+              <button class="pb-mini-btn" onclick="pbResetView()"><i class="ti ti-focus-2"></i></button>
+            </div>
+            <div class="pb-flow-canvas" id="pb-flow-canvas" onmousedown="pbCanvasPanStart(event)">
+              <div class="pb-flow-plane" id="pb-flow-plane">
+                <svg class="pb-flow-svg" id="pb-flow-svg"></svg>
+                <div id="pb-nodes-container"></div>
+                <div class="pb-canvas-empty" id="pb-canvas-empty">
+                  <i class="ti ti-drag-drop"></i>
+                  Arrastra agentes aquí para comenzar a construir el flujo.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Inspector / YAML -->
+        <div class="pb-flow-panel">
+          <div class="pb-flow-panel-head">
+            <div class="pb-flow-panel-title"><i class="ti ti-settings"></i> Inspector</div>
+            <span class="pb-flow-panel-sub" id="pb-ins-id"></span>
+          </div>
+          <div class="pb-inspector-body" id="pb-inspector">
+            <div class="pb-inspector-empty">Selecciona un nodo en el canvas para configurar su mensaje y opciones.</div>
+          </div>
+          <details class="pb-yaml-dock">
+            <summary><i class="ti ti-code"></i> Preview YAML</summary>
+            <pre id="pb-yaml-preview"></pre>
+          </details>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- OTHERS MODALS -->
+<div class="modal-overlay" id="pb-input-modal">
+  <div class="modal pb-input-dialog">
+    <div class="pb-input-head">
+      <div class="pb-input-icon"><i class="ti ti-player-play-filled"></i></div>
+      <div>
+        <div class="pb-input-title" id="pb-input-title">Ejecutar Playbook</div>
+        <div class="pb-input-subtitle" id="pb-input-subtitle"></div>
+      </div>
+    </div>
+    <div class="pb-input-body">
+      <label><span>Mensaje Inicial (Prompt)</span> <span>Opcional</span></label>
+      <textarea class="pb-input-textarea" id="pb-input-textarea" placeholder="Escribe el input inicial para el playbook..."></textarea>
+      <div class="pb-input-error" id="pb-input-error"></div>
+    </div>
+    <div class="pb-input-actions">
+      <button class="btn" onclick="pbCloseInputModal()">Cancelar</button>
+      <button class="btn primary" id="pb-input-run-btn" onclick="pbConfirmRun()"><i class="ti ti-send"></i> Iniciar Flujo</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="pb-delete-modal">
+  <div class="modal pb-delete-dialog">
+    <div class="pb-delete-head">
+      <div class="pb-delete-icon"><i class="ti ti-alert-triangle"></i></div>
+      <div>
+        <div class="pb-delete-title">Eliminar Playbook</div>
+        <div class="pb-delete-subtitle">Esta acción no se puede deshacer.</div>
+      </div>
+    </div>
+    <div class="pb-delete-name" id="pb-delete-name-display"></div>
+    <div class="pb-delete-actions">
+      <button class="btn" onclick="pbCloseDeleteModal()">Cancelar</button>
+      <button class="btn danger" onclick="pbConfirmDelete()"><i class="ti ti-trash"></i> Eliminar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <h2><i class="ti ti-plug"></i> Añadir agente</h2>
+    <label>Nombre</label>
+    <input id="m-name" placeholder="mi_agente" />
+    <label>URL completa</label>
+    <input id="m-url" placeholder="http://localhost:9001" />
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal()">Cancelar</button>
+      <button class="btn primary" onclick="addManual()"><i class="ti ti-check"></i> Añadir</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="user-modal">
+  <div class="modal">
+    <h2 id="user-modal-title"><i class="ti ti-user"></i> Nuevo Usuario</h2>
+    <input type="hidden" id="um-id" />
+    <label>Usuario (login)</label>
+    <input id="um-username" placeholder="jorge" />
+    <label>Nombre visible</label>
+    <input id="um-display" placeholder="Jorge D." />
+    <label>Contraseña</label>
+    <input type="password" id="um-password" placeholder="Dejar en blanco para no cambiar" />
+    <label>Rol</label>
+    <select id="um-role">
+      <option value="user">Usuario (operator)</option>
+      <option value="admin">Administrador</option>
+    </select>
+    
+    <!-- Permisos -->
+    <div style="margin-top:12px; border:1px solid var(--border); padding:10px; border-radius:6px; background:var(--bg)">
+      <div style="font-weight:600; font-size:12px; margin-bottom:8px;"><i class="ti ti-shield-lock"></i> Permisos Especiales</div>
+      <label style="display:flex; align-items:center; gap:6px; font-weight:normal; margin-bottom:4px;">
+        <input type="checkbox" id="um-perm-creator" /> Acceso a Creador de Agentes
+      </label>
+      <label style="display:flex; align-items:center; gap:6px; font-weight:normal; margin-bottom:4px;">
+        <input type="checkbox" id="um-perm-playbooks" /> Acceso a Playbooks
+      </label>
+      <label style="display:flex; align-items:center; gap:6px; font-weight:normal; margin-bottom:12px;">
+        <input type="checkbox" id="um-perm-workflows" /> Acceso a Workflows
+      </label>
+      <label>Agentes Permitidos</label>
+      <div id="um-perm-agents-list" style="margin-top:4px; max-height:130px; overflow-y:auto; border:1px solid var(--border); border-radius:4px; padding:8px; background:rgba(0,0,0,0.1)">
+        <!-- Generado por JS -->
+      </div>
+    </div>
+
+    <div style="margin-top:12px;display:flex;align-items:center;gap:8px;">
+      <input type="checkbox" id="um-active" checked /> <label style="margin:0">Activo</label>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeUserModal()">Cancelar</button>
+      <button class="btn primary" onclick="saveUser()"><i class="ti ti-device-floppy"></i> Guardar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="password-modal">
+  <div class="modal">
+    <h2><i class="ti ti-key"></i> Cambiar contraseña</h2>
+    <label>Contraseña actual</label>
+    <input type="password" id="pm-old" />
+    <label>Nueva contraseña</label>
+    <input type="password" id="pm-new" />
+    <div class="login-error" id="pm-error" style="margin-top:8px;"></div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closePasswordModal()">Cancelar</button>
+      <button class="btn primary" onclick="changePassword()"><i class="ti ti-check"></i> Cambiar</button>
+    </div>
+  </div>
+</div>
+
+<script src="/js/app.js"></script>
+</body>
+</html>
