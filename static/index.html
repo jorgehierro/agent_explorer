@@ -207,7 +207,7 @@
       <h2 id="pb-modal-title" style="margin-bottom:0;"><i class="ti ti-route"></i> Playbooks</h2>
       <button class="pb-mini-btn" style="margin-top:10px;" onclick="document.getElementById('playbook-modal').classList.remove('open')"><i class="ti ti-x"></i></button>
     </div>
-    <div class="pb-tabs" style="margin-top:10px;">
+    <div class="pb-tabs" id="pb-tabs-container" style="margin-top:10px;">
       <button class="pb-tab active" id="pb-btn-run" onclick="switchPbTab('run')"><i class="ti ti-player-play"></i> Ejecutar</button>
       <button class="pb-tab" id="pb-btn-create" onclick="switchPbTab('create')"><i class="ti ti-pencil"></i> Diseñador</button>
     </div>
@@ -287,27 +287,6 @@
   </div>
 </div>
 
-<!-- OTHERS MODALS -->
-<div class="modal-overlay" id="pb-input-modal">
-  <div class="modal pb-input-dialog">
-    <div class="pb-input-head">
-      <div class="pb-input-icon"><i class="ti ti-player-play-filled"></i></div>
-      <div>
-        <div class="pb-input-title" id="pb-input-title">Ejecutar Playbook</div>
-        <div class="pb-input-subtitle" id="pb-input-subtitle"></div>
-      </div>
-    </div>
-    <div class="pb-input-body">
-      <label><span>Mensaje Inicial (Prompt)</span> <span>Opcional</span></label>
-      <textarea class="pb-input-textarea" id="pb-input-textarea" placeholder="Escribe el input inicial para el playbook..."></textarea>
-      <div class="pb-input-error" id="pb-input-error"></div>
-    </div>
-    <div class="pb-input-actions">
-      <button class="btn" onclick="pbCloseInputModal()">Cancelar</button>
-      <button class="btn primary" id="pb-input-run-btn" onclick="pbConfirmRun()"><i class="ti ti-send"></i> Iniciar Flujo</button>
-    </div>
-  </div>
-</div>
 
 <div class="modal-overlay" id="pb-delete-modal">
   <div class="modal pb-delete-dialog">

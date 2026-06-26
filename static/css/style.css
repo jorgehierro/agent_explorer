@@ -284,6 +284,7 @@ header h1 {
 .modal input:focus, .modal select:focus { border-color: var(--blue-border); box-shadow: 0 0 0 3px color-mix(in srgb, var(--blue-border) 24%, transparent); }
 .modal-actions { display: flex; gap: 8px; margin-top: 1.5rem; justify-content: flex-end; }
 .modal.wide { width: 1180px; max-width: 98vw; height: 90vh; max-height: 92vh; display: flex; flex-direction: column; padding: 0; overflow: hidden; }
+.modal.medium { width: 600px; max-width: 90vw; height: auto; max-height: 85vh; display: flex; flex-direction: column; padding: 0; overflow: hidden; }
 
 /* LOGIN & ADMIN & USER MENU */
 .login-overlay { display: flex; position: fixed; inset: 0; background: var(--bg); z-index: 1000; align-items: center; justify-content: center; }

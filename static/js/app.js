@@ -422,6 +422,15 @@ async function sendMessage() {
   const msg = input.value.trim();
   if (!msg) return;
 
+  // Interceptar la ejecución de playbooks/workflows desde la barra de chat
+  const match = msg.match(/^\[Lanzar:\s*(.+?)\]\s*(.*)$/si);
+  if (match) {
+    const name = match[1].trim();
+    const payloadInput = match[2].trim();
+    executePlaybook(name, payloadInput);
+    return;
+  }
+
   isLoading = true;
   input.value = '';
   input.style.height = 'auto';
@@ -728,18 +737,30 @@ function switchPbTab(t) {
 
 function openPlaybookModal() {
   const kind = selectedAgentKind();
+  const tabs = document.getElementById('pb-tabs-container');
+  const modalBox = document.querySelector('#playbook-modal .modal');
+  
   document.getElementById('pb-modal-title').innerHTML = kind === 'workflow' ? '<i class="ti ti-route"></i> Workflows' : '<i class="ti ti-list-check"></i> Playbooks';
-  document.getElementById('pb-btn-run').innerHTML = '<i class="ti ti-player-play"></i> Ejecutar';
-  document.getElementById('pb-btn-create').innerHTML = '<i class="ti ti-pencil"></i> Diseñador';
   
   if (kind === 'workflow') {
-    document.getElementById('pb-btn-create').style.display = 'none';
+    if(tabs) tabs.style.display = 'none';
+    modalBox.classList.remove('wide');
+    modalBox.classList.add('medium');
+    switchPbTab('run');
   } else {
+    if(tabs) tabs.style.display = 'flex';
+    modalBox.classList.add('wide');
+    modalBox.classList.remove('medium');
+    document.getElementById('pb-btn-run').innerHTML = '<i class="ti ti-player-play"></i> Ejecutar';
+    document.getElementById('pb-btn-create').innerHTML = '<i class="ti ti-pencil"></i> Diseñador';
     document.getElementById('pb-btn-create').style.display = 'block';
+    if (!document.getElementById('pb-tab-run').classList.contains('active') && !document.getElementById('pb-tab-create').classList.contains('active')) {
+      switchPbTab('run');
+    }
   }
   
   document.getElementById('playbook-modal').classList.add('open');
-  switchPbTab('run');
+  pbRefreshList();
 }
 
 function pbZoom(delta) {
@@ -1032,7 +1053,7 @@ async function pbRefreshList() {
         
         return `
         <div class="playbook-item">
-          <div class="pb-run-area" onclick="pbOpenInputModal('${jsKey}')" title="Ejecutar">
+          <div class="pb-run-area" onclick="pbPrepareRun('${jsKey}')" title="Ejecutar">
             <div class="pb-run-main">
               <div class="pb-name"><i class="ti ti-player-play-filled" style="color:var(--blue-text);font-size:10px;margin-right:4px"></i> ${displayName}</div>
               <div class="pb-desc">${escapeHtml(descText)}</div>
@@ -1050,37 +1071,54 @@ async function pbRefreshList() {
 }
 
 let pbTargetRun = '';
-function pbOpenInputModal(name) {
-  pbTargetRun = name;
-  document.getElementById('pb-input-title').textContent = `Ejecutar: ${name}`;
-  document.getElementById('pb-input-textarea').value = '';
-  document.getElementById('pb-input-error').textContent = '';
-  document.getElementById('pb-input-modal').classList.add('open');
-  setTimeout(()=>document.getElementById('pb-input-textarea').focus(), 50);
+function pbPrepareRun(name) {
+  document.getElementById('playbook-modal').classList.remove('open');
+  const input = document.getElementById('msg-input');
+  input.value = `[Lanzar: ${name}]\n`;
+  input.focus();
 }
-function pbCloseInputModal() { document.getElementById('pb-input-modal').classList.remove('open'); }
-async function pbConfirmRun() {
-  const input = document.getElementById('pb-input-textarea').value.trim();
-  const btn = document.getElementById('pb-input-run-btn');
-  btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader-2"></i>';
+
+async function executePlaybook(name, payloadInput) {
+  const inputEl = document.getElementById('msg-input');
+  const btn = document.getElementById('send-btn');
+  isLoading = true;
+  inputEl.value = '';
+  inputEl.style.height = 'auto';
+  inputEl.disabled = true;
+  btn.disabled = true;
+  
+  histories[selected].push({ role: 'user', content: `[Lanzado: ${name}]\n${payloadInput}` });
+  histories[selected].push({ role: 'typing' });
+  renderMessages();
+
   try {
     const a = agents[selected];
-    const endp = selectedAgentKind() === 'workflow' ? `/workflows/${pbTargetRun}/run` : `/playbooks/${pbTargetRun}/run`;
+    const endp = selectedAgentKind() === 'workflow' ? `/workflows/${name}/run` : `/playbooks/${name}/run`;
     const r = await fetch('/api/proxy/fetch', {
       method: 'POST', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ url: a.url + endp, method: 'POST', body: { initial: input } })
+      body: JSON.stringify({ url: a.url + endp, method: 'POST', body: { initial: payloadInput } })
     });
+    
+    histories[selected] = histories[selected].filter(m => m.role !== 'typing');
+    
     if(r.ok) {
       const res = await r.json();
-      pbCloseInputModal();
-      document.getElementById('playbook-modal').classList.remove('open');
-      histories[selected].push({ role: 'user', content: `[Lanzado: ${pbTargetRun}]\n${input}` });
-      histories[selected].push({ role: 'playbook', playbook: pbTargetRun, trace: res.trace });
-      renderMessages();
+      histories[selected].push({ role: 'playbook', playbook: name, trace: res.trace });
       showToast('Ejecución completada');
-    } else { const err = await r.json(); document.getElementById('pb-input-error').textContent = err.error || 'Error en ejecución'; }
-  } catch(e) { document.getElementById('pb-input-error').textContent = 'Error de red'; }
-  btn.disabled = false; btn.innerHTML = '<i class="ti ti-send"></i> Iniciar Flujo';
+    } else { 
+      const err = await r.json(); 
+      histories[selected].push({ role: 'error', content: err.error || 'Error en ejecución' }); 
+    }
+  } catch(e) { 
+    histories[selected] = histories[selected].filter(m => m.role !== 'typing');
+    histories[selected].push({ role: 'error', content: 'Error de red al ejecutar playbook' }); 
+  }
+  
+  isLoading = false;
+  inputEl.disabled = false;
+  btn.disabled = false;
+  inputEl.focus();
+  renderMessages();
 }
 
 let pbTargetDel = '';
@@ -1098,6 +1136,99 @@ async function pbConfirmDelete() {
     pbCloseDeleteModal();
     if(r.ok) { showToast('Eliminado correctamente'); pbRefreshList(); } else alert('Error al eliminar');
   } catch(e) { pbCloseDeleteModal(); alert('Error de conexión'); }
+}
+
+// --- AGENT CREATOR ---
+function acBase() { return document.getElementById('ac-creator-url').value.trim().replace(/\/$/, ''); }
+function acSnake(value) { return String(value || '').trim().toLowerCase().replace(/[^a-z0-9_\-\s]/g, '').replace(/[\-\s]+/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, ''); }
+function acSyncEnvHint() { const name = acSnake(document.getElementById('ac-agent-name').value); document.getElementById('ac-env-hint').value = name ? `AGENT_${name.toUpperCase()}_PORT` : ''; }
+function acToggleTools() { const enabled = document.getElementById('ac-use-tools').checked; document.getElementById('ac-tool-profile-wrap').style.display = enabled ? 'flex' : 'none'; if (enabled) acLoadToolProfiles(); }
+function acSetStatus(text) { document.getElementById('ac-status').textContent = text; }
+function acToast(message, ok = true) { showToast(message, ok ? 'success' : 'error'); }
+
+function acPayload() {
+  const portValue = document.getElementById('ac-port')?.value;
+  return {
+    agent_name: document.getElementById('ac-agent-name').value,
+    description: document.getElementById('ac-description').value,
+    prompt: document.getElementById('ac-prompt').value,
+    port: portValue ? Number(portValue) : null,
+    use_tools: document.getElementById('ac-use-tools').checked,
+    tool_profile: document.getElementById('ac-tool-profile').value || null,
+    capabilities: document.getElementById('ac-capabilities').value.split(',').map(x => x.trim()).filter(Boolean),
+    overwrite: document.getElementById('ac-overwrite').checked
+  };
+}
+
+async function acLoadToolProfiles() {
+  const select = document.getElementById('ac-tool-profile'); const current = select.value; select.innerHTML = '<option value="">Cargando perfiles...</option>';
+  try { 
+    const response = await fetch(`${acBase()}/tool-profiles`, { signal: AbortSignal.timeout(15000) }); 
+    const data = await response.json(); 
+    if (!response.ok) throw new Error(JSON.stringify(data)); 
+    const profiles = data.profiles || []; 
+    if (!profiles.length) { select.innerHTML = '<option value="">No hay perfiles en agent_config.yaml</option>'; return; }
+    select.innerHTML = '<option value="">Selecciona perfil...</option>' + profiles.map(profile => { 
+      const servers = (profile.servers || []).map(server => server.name).filter(Boolean).join(', '); 
+      const label = servers ? `${profile.name} - ${servers}` : profile.name; 
+      return `<option value="${escapeHtml(profile.name)}">${escapeHtml(label)}</option>`; 
+    }).join('');
+    if (current && [...select.options].some(option => option.value === current)) select.value = current;
+  } catch (error) { 
+    select.innerHTML = '<option value="">Error cargando perfiles</option>'; 
+    acToast('No se pudieron cargar perfiles: ' + error.message, false); 
+  }
+}
+
+async function acPost(path, body) { 
+  const response = await fetch(`${acBase()}${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: AbortSignal.timeout(60000) }); 
+  const text = await response.text(); 
+  let data; 
+  try { data = JSON.parse(text); } catch { data = text; } 
+  if (!response.ok) throw new Error(typeof data === 'string' ? data : JSON.stringify(data, null, 2)); 
+  return data; 
+}
+
+let acCurrentPreview = null;
+function acRenderPreview(data) {
+  acCurrentPreview = data;
+  const files = Object.entries(data.files || {});
+  if (data.planned_updates) files.push(['planned_updates.json', JSON.stringify(data.planned_updates, null, 2)]);
+  document.getElementById('ac-tabs').innerHTML = files.map(([path], idx) => `<button class="ac-tab ${idx === 0 ? 'active' : ''}" onclick="acShowFile(${idx})">${escapeHtml(path.split('/').slice(-2).join('/'))}</button>`).join('');
+  acShowFile(0);
+}
+
+function acShowFile(index) { 
+  const files = Object.entries(acCurrentPreview?.files || {}); 
+  if (acCurrentPreview?.planned_updates) files.push(['planned_updates.json', JSON.stringify(acCurrentPreview.planned_updates, null, 2)]); 
+  if (!files[index]) return; 
+  document.querySelectorAll('.ac-tab').forEach((tab, idx) => tab.classList.toggle('active', idx === index)); 
+  document.getElementById('ac-preview').textContent = `# ${files[index][0]}\n\n${files[index][1]}`; 
+}
+
+async function acPreviewAgent() { 
+  try { 
+    acSetStatus('Generando preview...'); 
+    const data = await acPost('/preview', acPayload()); 
+    acRenderPreview(data); 
+    acSetStatus('Preview generado'); 
+  } catch (error) { 
+    acSetStatus('Error'); 
+    acToast(error.message, false); 
+  } 
+}
+
+async function acCreateAgent() { 
+  try { 
+    acSetStatus('Creando agente...'); 
+    const data = await acPost('/create', acPayload()); 
+    acSetStatus('Agente creado'); 
+    acToast(`Agente creado: ${data.agent_name}\n\n${(data.next_steps || []).join('\n')}`); 
+    await acPreviewAgent(); 
+  } catch (error) { 
+    acSetStatus('Error'); 
+    acToast(error.message, false); 
+  } 
 }
 
 // Start app
