@@ -1,0 +1,1565 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Agent Explorer</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #f8f8f6;
+      --surface: #ffffff;
+      --surface2: #f1f0eb;
+      --border: rgba(0,0,0,0.1);
+      --border2: rgba(0,0,0,0.18);
+      --text: #1a1a1a;
+      --text2: #555;
+      --text3: #999;
+      --blue-bg: #e6f1fb;
+      --blue-text: #0c447c;
+      --blue-border: #85b7eb;
+      --green: #3b6d11;
+      --red: #a32d2d;
+      --red-bg: #fcebeb;
+      --red-text: #a32d2d;
+      --radius: 8px;
+      --radius-lg: 12px;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #1a1a18;
+        --surface: #242422;
+        --surface2: #2e2e2b;
+        --border: rgba(255,255,255,0.1);
+        --border2: rgba(255,255,255,0.18);
+        --text: #f0efe8;
+        --text2: #aaa;
+        --text3: #666;
+        --blue-bg: #042c53;
+        --blue-text: #b5d4f4;
+        --blue-border: #185fa5;
+        --green: #c0dd97;
+        --red: #f09595;
+        --red-bg: #501313;
+        --red-text: #f7c1c1;
+      }
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* HEADER */
+    header {
+      padding: 12px 20px;
+      border-bottom: 0.5px solid var(--border);
+      background: var(--surface);
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-shrink: 0;
+    }
+    header h1 {
+      font-size: 15px;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--text);
+    }
+    .discover-form {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex: 1;
+    }
+    .discover-form input {
+      padding: 6px 10px;
+      border: 0.5px solid var(--border2);
+      border-radius: var(--radius);
+      font-size: 13px;
+      background: var(--surface2);
+      color: var(--text);
+      outline: none;
+    }
+    .discover-form input:focus { border-color: var(--blue-border); }
+    .discover-form input.url { width: 180px; }
+    .discover-form input.ports { width: 160px; }
+    .btn {
+      padding: 6px 14px;
+      border: 0.5px solid var(--border2);
+      border-radius: var(--radius);
+      background: var(--surface);
+      color: var(--text);
+      font-size: 13px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+      transition: background 0.12s;
+    }
+    .btn:hover { background: var(--surface2); }
+    .btn:active { transform: scale(0.98); }
+    .btn.primary { background: var(--blue-bg); color: var(--blue-text); border-color: var(--blue-border); }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* LAYOUT */
+    .main {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* SIDEBAR */
+    .sidebar {
+      width: 220px;
+      flex-shrink: 0;
+      border-right: 0.5px solid var(--border);
+      background: var(--surface);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .sidebar-header {
+      padding: 12px 14px 8px;
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text3);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      border-bottom: 0.5px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .agents-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px;
+    }
+    .agent-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 10px;
+      border-radius: var(--radius);
+      cursor: pointer;
+      font-size: 13px;
+      color: var(--text);
+      border: 0.5px solid transparent;
+      margin-bottom: 2px;
+      transition: background 0.12s;
+    }
+    .agent-item:hover { background: var(--surface2); }
+    .agent-item.active { background: var(--blue-bg); color: var(--blue-text); border-color: var(--blue-border); }
+    .agent-item .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text3); flex-shrink: 0; }
+    .agent-item.ok .dot { background: var(--green); }
+    .agent-item.err .dot { background: var(--red); }
+    .agent-item .name { flex: 1; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .agent-item .port-tag { font-size: 11px; color: var(--text3); }
+    .agent-item.active .port-tag { color: var(--blue-text); opacity: 0.7; }
+    .sidebar-footer { padding: 8px; border-top: 0.5px solid var(--border); }
+    .add-btn {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      width: 100%;
+      padding: 7px 10px;
+      border: 0.5px dashed var(--border2);
+      border-radius: var(--radius);
+      background: transparent;
+      color: var(--text3);
+      font-size: 13px;
+      cursor: pointer;
+      transition: background 0.12s;
+    }
+    .add-btn:hover { background: var(--surface2); color: var(--text2); }
+    .empty-sidebar { padding: 16px 10px; font-size: 12px; color: var(--text3); line-height: 1.6; }
+
+    /* CHAT AREA */
+    .chat-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* AGENT INFO BAR */
+    .agent-bar {
+      padding: 10px 16px;
+      border-bottom: 0.5px solid var(--border);
+      background: var(--surface);
+      display: none;
+      align-items: center;
+      gap: 12px;
+      flex-shrink: 0;
+    }
+    .agent-bar.visible { display: flex; }
+    .agent-bar .ab-name { font-size: 14px; font-weight: 500; }
+    .agent-bar .ab-desc { font-size: 12px; color: var(--text2); flex: 1; }
+    .cap-badge {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 20px;
+      background: var(--surface2);
+      color: var(--text2);
+      border: 0.5px solid var(--border);
+    }
+    .status-badge {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 20px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .status-badge.ok { background: #eaf3de; color: #3b6d11; }
+    .status-badge.err { background: var(--red-bg); color: var(--red-text); }
+    @media (prefers-color-scheme: dark) {
+      .status-badge.ok { background: #173404; color: #c0dd97; }
+    }
+
+    /* MESSAGES */
+    .messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .welcome {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      flex: 1;
+      gap: 10px;
+      color: var(--text3);
+    }
+    .welcome i { font-size: 40px; }
+    .welcome p { font-size: 14px; }
+    .msg-row { display: flex; flex-direction: column; gap: 2px; }
+    .msg-row.user { align-items: flex-end; }
+    .msg-row.agent { align-items: flex-start; }
+    .msg-row.system { align-items: center; }
+    .msg-label { font-size: 11px; color: var(--text3); padding: 0 4px; }
+    .bubble {
+      padding: 10px 14px;
+      border-radius: var(--radius-lg);
+      font-size: 14px;
+      line-height: 1.6;
+      max-width: 72%;
+      word-break: break-word;
+    }
+    .bubble.user { white-space: pre-wrap; }
+    .bubble.user { background: var(--blue-bg); color: var(--blue-text); border-radius: var(--radius-lg) var(--radius-lg) 4px var(--radius-lg); }
+    .bubble.agent { background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--radius-lg) var(--radius-lg) var(--radius-lg) 4px; }
+    .bubble.system { background: transparent; color: var(--text3); font-size: 12px; border: none; padding: 2px 8px; max-width: 100%; text-align: center; }
+    .bubble.error { background: var(--red-bg); color: var(--red-text); border: 0.5px solid var(--red); }
+    .typing { display: flex; gap: 4px; align-items: center; padding: 12px 14px; }
+    .typing span { width: 6px; height: 6px; border-radius: 50%; background: var(--text3); animation: bounce 1.2s infinite; }
+    .typing span:nth-child(2) { animation-delay: 0.2s; }
+    .typing span:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes bounce { 0%,60%,100% { transform: translateY(0); } 30% { transform: translateY(-6px); } }
+
+    /* INPUT BAR */
+    .input-bar {
+      padding: 12px 16px;
+      border-top: 0.5px solid var(--border);
+      background: var(--surface);
+      display: flex;
+      gap: 8px;
+      align-items: flex-end;
+      flex-shrink: 0;
+    }
+    .input-bar textarea {
+      flex: 1;
+      padding: 9px 12px;
+      border: 0.5px solid var(--border2);
+      border-radius: var(--radius);
+      font-size: 14px;
+      background: var(--surface2);
+      color: var(--text);
+      resize: none;
+      outline: none;
+      min-height: 38px;
+      max-height: 120px;
+      font-family: inherit;
+      line-height: 1.5;
+    }
+    .input-bar textarea:focus { border-color: var(--blue-border); }
+    .input-bar textarea:disabled { opacity: 0.5; }
+
+    /* MODAL */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.4);
+      z-index: 200;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: var(--surface);
+      border: 0.5px solid var(--border2);
+      border-radius: var(--radius-lg);
+      padding: 1.5rem;
+      width: 340px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+    }
+    .modal h2 { font-size: 15px; font-weight: 500; margin-bottom: 1rem; }
+    .modal label { font-size: 12px; color: var(--text2); display: block; margin-bottom: 4px; margin-top: 12px; }
+    .modal input {
+      width: 100%;
+      padding: 8px 10px;
+      border: 0.5px solid var(--border2);
+      border-radius: var(--radius);
+      font-size: 14px;
+      background: var(--surface2);
+      color: var(--text);
+      outline: none;
+    }
+    .modal input:focus { border-color: var(--blue-border); }
+    .modal-actions { display: flex; gap: 8px; margin-top: 1.25rem; justify-content: flex-end; }
+
+    /* EXTRA FIELDS */
+    .extra-fields {
+      padding: 8px 16px 0;
+      background: var(--surface);
+      display: none;
+      flex-direction: column;
+      gap: 6px;
+      border-top: 0.5px solid var(--border);
+    }
+    .extra-fields.visible { display: flex; }
+    .extra-fields-toggle {
+      font-size: 11px;
+      color: var(--text3);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 0;
+      user-select: none;
+    }
+    .extra-fields-toggle:hover { color: var(--text2); }
+    .extra-fields-body { display: flex; flex-direction: column; gap: 6px; padding-bottom: 8px; }
+    .extra-field-row { display: flex; align-items: center; gap: 8px; }
+    .extra-field-row label {
+      font-size: 11px;
+      color: var(--text3);
+      width: 120px;
+      flex-shrink: 0;
+      text-align: right;
+    }
+    .extra-field-row input, .extra-field-row textarea {
+      flex: 1;
+      padding: 5px 8px;
+      border: 0.5px solid var(--border2);
+      border-radius: var(--radius);
+      font-size: 12px;
+      background: var(--surface2);
+      color: var(--text);
+      outline: none;
+      font-family: inherit;
+    }
+    .extra-field-row input:focus, .extra-field-row textarea:focus { border-color: var(--blue-border); }
+    .extra-field-row .field-type { font-size: 10px; color: var(--text3); flex-shrink: 0; }
+
+    /* ORCHESTRATOR RESULTS */
+    .orch-bubble { background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--radius-lg) var(--radius-lg) var(--radius-lg) 4px; padding: 0; overflow: hidden; max-width: 90%; align-self: flex-start; }
+    .orch-reasoning { font-size: 12px; color: var(--text3); padding: 8px 14px 6px; border-bottom: 0.5px solid var(--border); font-style: italic; }
+    .orch-agent-result { padding: 10px 14px; border-bottom: 0.5px solid var(--border); }
+    .orch-agent-result:last-child { border-bottom: none; }
+    .orch-agent-header { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; color: var(--text2); margin-bottom: 6px; }
+    .orch-agent-header .ok { color: #3b6d11; }
+    .orch-agent-header .err { color: var(--red); }
+    .orch-agent-content { font-size: 14px; color: var(--text); line-height: 1.6; }
+
+    /* PLAYBOOK TRACE */
+    .trace-bubble { background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--radius-lg) var(--radius-lg) var(--radius-lg) 4px; padding: 0; overflow: hidden; max-width: 90%; }
+    .trace-step { padding: 8px 14px; border-bottom: 0.5px solid var(--border); }
+    .trace-step:last-child { border-bottom: none; }
+    .trace-step-header { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; color: var(--text2); margin-bottom: 4px; }
+    .trace-step-header .ok { color: #3b6d11; }
+    .trace-step-header .err { color: var(--red); }
+    .trace-step-content { font-size: 13px; color: var(--text); line-height: 1.5; word-break: break-word; }
+
+    /* PLAYBOOK MODAL */
+    .modal.wide { width: 700px; max-width: 95vw; }
+    .modal.wide textarea {
+      width: 100%; font-family: 'Courier New', monospace; font-size: 12px;
+      padding: 10px; border: 0.5px solid var(--border2); border-radius: var(--radius);
+      background: var(--surface2); color: var(--text); resize: vertical; outline: none;
+      min-height: 300px; line-height: 1.6;
+    }
+    .modal.wide textarea:focus { border-color: var(--blue-border); }
+    .playbook-list { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; max-height: 280px; overflow-y: auto; }
+    .playbook-item { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 0.5px solid var(--border); border-radius: var(--radius); cursor: pointer; font-size: 13px; transition: background 0.12s; }
+    .playbook-item:hover { background: var(--surface2); }
+    .playbook-item .pb-name { font-weight: 500; flex: 1; }
+    .playbook-item .pb-desc { font-size: 11px; color: var(--text3); }
+    .playbook-item .pb-steps { font-size: 11px; color: var(--text3); white-space: nowrap; }
+    .pb-tabs { display: flex; gap: 4px; margin-bottom: 12px; }
+    .pb-tab { padding: 5px 14px; border: 0.5px solid var(--border2); border-radius: var(--radius); font-size: 13px; cursor: pointer; background: transparent; color: var(--text2); }
+    .pb-tab.active { background: var(--blue-bg); color: var(--blue-text); border-color: var(--blue-border); }
+    .pb-section { display: none; }
+    .pb-section.active { display: block; }
+
+    /* SCROLLBAR */
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 4px; }
+
+    /* Markdown en burbujas del agente */
+    .bubble.agent h1, .bubble.agent h2, .bubble.agent h3 {
+      font-size: 1em; font-weight: 600; margin: 0.4em 0 0.2em;
+    }
+    .bubble.agent p { margin: 0.2em 0; }
+    .bubble.agent ul, .bubble.agent ol { padding-left: 1.4em; margin: 0.3em 0; }
+    .bubble.agent li { margin: 0.1em 0; }
+    .bubble.agent code {
+      background: var(--surface2); border: 0.5px solid var(--border);
+      border-radius: 4px; padding: 1px 5px; font-size: 0.88em; font-family: monospace;
+    }
+    .bubble.agent pre {
+      background: var(--surface2); border: 0.5px solid var(--border);
+      border-radius: var(--radius); padding: 10px 12px; overflow-x: auto; margin: 0.4em 0;
+    }
+    .bubble.agent pre code { background: none; border: none; padding: 0; font-size: 0.85em; }
+    .bubble.agent blockquote {
+      border-left: 3px solid var(--border2); margin: 0.4em 0;
+      padding: 2px 0 2px 10px; color: var(--text2);
+    }
+    .bubble.agent a { color: var(--blue-text); }
+    .bubble.agent table { border-collapse: collapse; width: 100%; font-size: 0.9em; margin: 0.4em 0; }
+    .bubble.agent th, .bubble.agent td {
+      border: 0.5px solid var(--border2); padding: 4px 8px; text-align: left;
+    }
+    .bubble.agent th { background: var(--surface2); font-weight: 600; }
+
+    /* PLAYBOOK BUILDER */
+    .pb-step-card { border:0.5px solid var(--border2); border-radius:var(--radius); background:var(--surface); overflow:hidden; cursor:grab; transition:box-shadow 0.15s,opacity 0.15s; }
+    .pb-step-card:active { cursor:grabbing; }
+    .pb-step-card.dragging { opacity:0.4; }
+    .pb-step-card.drag-over { border-color:var(--blue-border); background:var(--blue-bg); }
+    .pb-step-head { display:flex; align-items:center; gap:8px; padding:7px 10px; background:var(--surface2); border-bottom:0.5px solid var(--border); }
+    .pb-grip { color:var(--text3); cursor:grab; font-size:14px; flex-shrink:0; }
+    .pb-step-id-input { width:80px; border:0.5px solid var(--border2); border-radius:4px; padding:2px 6px; font-size:11px; background:var(--surface); color:var(--text); outline:none; font-family:inherit; }
+    .pb-type-btn { padding:2px 10px; border:0.5px solid var(--border2); border-radius:20px; font-size:11px; cursor:pointer; background:var(--surface); color:var(--text2); transition:background 0.1s; }
+    .pb-type-btn.active { background:var(--blue-bg); color:var(--blue-text); border-color:var(--blue-border); }
+    .pb-del { color:var(--text3); cursor:pointer; font-size:14px; }
+    .pb-del:hover { color:var(--red); }
+    .pb-step-body { padding:10px; display:flex; flex-direction:column; gap:8px; }
+    .pb-select { width:100%; padding:6px 8px; border:0.5px solid var(--border2); border-radius:var(--radius); font-size:13px; background:var(--surface2); color:var(--text); outline:none; }
+    .pb-textarea { width:100%; padding:6px 8px; border:0.5px solid var(--border2); border-radius:var(--radius); font-size:13px; background:var(--surface2); color:var(--text); outline:none; font-family:inherit; resize:vertical; min-height:52px; }
+    .pb-select:focus, .pb-textarea:focus { border-color:var(--blue-border); }
+    .pb-flabel { font-size:11px; color:var(--text3); margin-bottom:2px; }
+    .pb-refs { font-size:11px; color:var(--text3); }
+    .pb-refs code { background:var(--surface2); padding:1px 4px; border-radius:3px; font-size:10px; }
+    .pb-par-row { display:flex; gap:6px; align-items:flex-start; padding:8px; border:0.5px solid var(--border); border-radius:var(--radius); background:var(--surface2); }
+    .pb-par-row .pb-select { flex:0 0 150px; }
+    .pb-par-row .pb-textarea { flex:1; min-height:40px; }
+    .pb-par-del { color:var(--text3); cursor:pointer; font-size:13px; padding-top:6px; flex-shrink:0; }
+    .pb-par-del:hover { color:var(--red); }
+    .pb-add-par { font-size:12px; color:var(--blue-text); cursor:pointer; padding:4px 0; display:flex; align-items:center; gap:4px; }
+    .pb-add-par:hover { opacity:0.7; }
+    .pb-empty-canvas { text-align:center; padding:24px; color:var(--text3); font-size:13px; border:1.5px dashed var(--border2); border-radius:var(--radius); }
+    /* PLAYBOOK INPUT DIALOG */
+    .pb-input-dialog { width: 520px; max-width: 94vw; padding: 0; overflow: hidden; }
+    .pb-input-head { padding: 16px 18px 12px; display: flex; align-items: flex-start; gap: 12px; border-bottom: 0.5px solid var(--border); }
+    .pb-input-icon { width: 34px; height: 34px; border-radius: 10px; display: flex; align-items: center; justify-content: center; background: var(--blue-bg); color: var(--blue-text); border: 0.5px solid var(--blue-border); flex-shrink: 0; }
+    .pb-input-title { font-size: 15px; font-weight: 600; margin-bottom: 3px; color: var(--text); }
+    .pb-input-subtitle { font-size: 12px; color: var(--text3); line-height: 1.45; }
+    .pb-input-body { padding: 14px 18px 4px; }
+    .pb-input-body label { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--text2); margin-bottom: 6px; }
+    .pb-input-body label span:last-child { color: var(--text3); font-size: 11px; }
+    .pb-input-textarea { width: 100%; min-height: 128px; max-height: 260px; resize: vertical; padding: 10px 12px; border: 0.5px solid var(--border2); border-radius: var(--radius); background: var(--surface2); color: var(--text); outline: none; font: inherit; font-size: 14px; line-height: 1.5; }
+    .pb-input-textarea:focus { border-color: var(--blue-border); box-shadow: 0 0 0 3px color-mix(in srgb, var(--blue-border) 24%, transparent); }
+    .pb-input-error { min-height: 18px; margin-top: 5px; font-size: 12px; color: var(--red-text); }
+    .pb-input-actions { display: flex; gap: 8px; justify-content: flex-end; padding: 12px 18px 16px; }
+    /* PLAYBOOK DELETE */
+    .playbook-item { padding: 0; cursor: default; overflow: hidden; }
+    .pb-run-area { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; padding: 8px 10px; cursor: pointer; }
+    .pb-run-area:hover { background: var(--surface2); }
+    .pb-run-main { flex: 1; min-width: 0; }
+    .pb-del-btn { margin-right: 6px; width: 30px; height: 30px; border: 0.5px solid transparent; border-radius: var(--radius); background: transparent; color: var(--text3); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .pb-del-btn:hover { color: var(--red-text); background: var(--red-bg); border-color: var(--red); }
+    .btn.danger { background: var(--red-bg); color: var(--red-text); border-color: var(--red); }
+    .btn.danger:hover { filter: brightness(0.98); }
+    .pb-delete-dialog { width: 440px; max-width: 94vw; padding: 0; overflow: hidden; }
+    .pb-delete-head { padding: 16px 18px 12px; display: flex; gap: 12px; align-items: flex-start; border-bottom: 0.5px solid var(--border); }
+    .pb-delete-icon { width: 34px; height: 34px; border-radius: 10px; display: flex; align-items: center; justify-content: center; background: var(--red-bg); color: var(--red-text); border: 0.5px solid var(--red); flex-shrink: 0; }
+    .pb-delete-title { font-size: 15px; font-weight: 600; margin-bottom: 3px; color: var(--text); }
+    .pb-delete-subtitle { font-size: 12px; color: var(--text3); line-height: 1.45; }
+    .pb-delete-name { margin: 14px 18px 0; padding: 10px 12px; border-radius: var(--radius); background: var(--surface2); border: 0.5px solid var(--border); font-size: 13px; color: var(--text); word-break: break-word; }
+    .pb-delete-actions { display: flex; justify-content: flex-end; gap: 8px; padding: 16px 18px; }
+
+  
+    /* N8N-LIKE PLAYBOOK BUILDER + ZOOM */
+    .pb-flow-modal{display:flex;flex-direction:column;padding:0}.pb-flow-modal>h2{padding:16px 18px 0;margin:0 0 10px}.pb-flow-modal .pb-tabs{padding:0 18px;margin-bottom:10px}#pb-tab-create.active{display:flex;flex-direction:column;flex:1;min-height:0;padding:0 14px 14px}#pb-tab-run.active{padding:0 18px 12px}.pb-flow-topbar{display:grid;grid-template-columns:minmax(180px,1fr) minmax(260px,1.4fr) auto;gap:8px;align-items:center;padding:10px;border:.5px solid var(--border);border-radius:var(--radius-lg);background:linear-gradient(180deg,var(--surface),var(--surface2));margin-bottom:10px}.pb-flow-input{width:100%;padding:8px 10px;border:.5px solid var(--border2);border-radius:var(--radius);font-size:13px;background:var(--surface);color:var(--text);outline:none}.pb-flow-workbench{display:grid;grid-template-columns:220px minmax(420px,1fr) 285px;gap:10px;flex:1;min-height:0}.pb-flow-panel{border:.5px solid var(--border);border-radius:var(--radius-lg);background:var(--surface);overflow:hidden;min-height:0;display:flex;flex-direction:column}.pb-flow-panel-head{padding:10px 12px;border-bottom:.5px solid var(--border);background:var(--surface2);display:flex;align-items:center;justify-content:space-between}.pb-flow-panel-title{font-size:12px;font-weight:600;color:var(--text2);display:flex;align-items:center;gap:6px}.pb-flow-panel-sub{font-size:11px;color:var(--text3);margin-top:2px}.pb-agent-search{margin:10px;width:calc(100% - 20px);padding:7px 9px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--surface2);color:var(--text);outline:none;font-size:12px}.pb-agent-palette{padding:0 10px 10px;overflow:auto;display:flex;flex-direction:column;gap:7px}.pb-agent-chip{padding:9px 10px;border:.5px solid var(--border);border-radius:var(--radius);background:var(--surface);cursor:grab;display:flex;align-items:center;gap:8px;transition:.12s;font-size:12px}.pb-agent-chip:hover{transform:translateY(-1px);border-color:var(--blue-border);background:var(--blue-bg);color:var(--blue-text)}.pb-agent-chip .agent-dot{width:8px;height:8px;border-radius:50%;background:var(--green)}.pb-agent-chip .agent-meta{margin-left:auto;color:var(--text3);font-size:10px}.pb-flow-canvas-wrap{position:relative;min-height:0;background:radial-gradient(circle at 1px 1px,var(--border) 1px,transparent 0);background-size:22px 22px;border:.5px solid var(--border);border-radius:var(--radius-lg);overflow:hidden}.pb-flow-canvas-toolbar{position:absolute;left:12px;top:12px;z-index:5;display:flex;gap:6px;padding:5px;background:color-mix(in srgb,var(--surface) 88%,transparent);backdrop-filter:blur(8px);border:.5px solid var(--border);border-radius:999px;box-shadow:0 4px 18px rgba(0,0,0,.08)}.pb-flow-canvas-toolbar.zoom{left:auto;right:12px}.pb-mini-btn{width:28px;height:28px;border:.5px solid var(--border);border-radius:999px;background:var(--surface);color:var(--text2);cursor:pointer;display:flex;align-items:center;justify-content:center}.pb-mini-btn:hover{background:var(--blue-bg);color:var(--blue-text);border-color:var(--blue-border)}.pb-zoom-indicator{min-width:52px;height:28px;display:inline-flex;align-items:center;justify-content:center;padding:0 8px;border:.5px solid var(--border);border-radius:999px;background:var(--surface);color:var(--text2);font-size:11px;user-select:none}.pb-flow-canvas{position:relative;width:100%;height:100%;min-height:520px;overflow:auto}.pb-flow-plane{position:relative;width:1500px;min-width:100%;height:1000px;transform-origin:0 0}.pb-flow-svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:1}.pb-flow-link{fill:none;stroke:var(--blue-border);stroke-width:2;stroke-dasharray:6 6;opacity:.9}.pb-flow-link-shadow{fill:none;stroke:rgba(0,0,0,.10);stroke-width:6;opacity:.35}.pb-node{position:absolute;width:245px;min-height:112px;border:.5px solid var(--border2);border-radius:16px;background:var(--surface);box-shadow:0 10px 28px rgba(0,0,0,.08);z-index:2;cursor:grab;transition:.15s;overflow:hidden}.pb-node.selected{border-color:var(--blue-border);box-shadow:0 0 0 3px color-mix(in srgb,var(--blue-border) 24%,transparent),0 16px 38px rgba(0,0,0,.16)}.pb-node.dragging{opacity:.78;cursor:grabbing}.pb-node-head{padding:10px 11px;display:flex;align-items:center;gap:8px;border-bottom:.5px solid var(--border);background:linear-gradient(180deg,var(--surface2),var(--surface))}.pb-node-icon{width:28px;height:28px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:var(--blue-bg);color:var(--blue-text);border:.5px solid var(--blue-border);flex-shrink:0}.pb-node.parallel .pb-node-icon{background:#efe7ff;color:#5a2ea6;border-color:#b9a2eb}.pb-node-title{font-size:13px;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.pb-node-kind{font-size:10px;color:var(--text3);margin-top:1px;text-transform:uppercase}.pb-node-body{padding:10px 11px;font-size:12px;color:var(--text2);line-height:1.4}.pb-node-message{margin-top:6px;color:var(--text3);font-size:11px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.pb-node-foot{padding:7px 10px;border-top:.5px solid var(--border);display:flex;justify-content:space-between;align-items:center;font-size:10px;color:var(--text3)}.pb-port{position:absolute;width:12px;height:12px;border-radius:50%;background:var(--surface);border:2px solid var(--blue-border);top:50%;transform:translateY(-50%);z-index:3}.pb-port.in{left:-6px}.pb-port.out{right:-6px}.pb-parallel-pill{display:flex;align-items:center;gap:5px;padding:5px 7px;background:var(--surface2);border:.5px solid var(--border);border-radius:999px;font-size:11px;margin-top:5px}.pb-canvas-empty{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);text-align:center;color:var(--text3);width:320px;padding:20px;border:1.5px dashed var(--border2);border-radius:18px;background:color-mix(in srgb,var(--surface) 76%,transparent)}.pb-canvas-empty i{font-size:36px;margin-bottom:8px;display:block}.pb-inspector-body{padding:12px;overflow:auto;display:flex;flex-direction:column;gap:10px}.pb-inspector-empty{color:var(--text3);font-size:12px;line-height:1.5;padding:18px 4px;text-align:center}.pb-field{display:flex;flex-direction:column;gap:5px}.pb-field label{font-size:11px;color:var(--text3);margin:0}.pb-field input,.pb-field select,.pb-field textarea{width:100%;padding:8px 9px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--surface2);color:var(--text);font:inherit;font-size:12px;outline:none}.pb-field textarea{min-height:86px;resize:vertical}.pb-inspector-actions{display:grid;grid-template-columns:1fr 1fr;gap:7px}.pb-ref-box{padding:8px;border-radius:var(--radius);background:var(--surface2);border:.5px solid var(--border);font-size:11px;color:var(--text3);line-height:1.65}.pb-ref-box code{background:var(--surface);border:.5px solid var(--border);border-radius:4px;padding:1px 5px;color:var(--text2);cursor:pointer}.pb-par-editor{display:flex;flex-direction:column;gap:8px}.pb-par-editor-row{border:.5px solid var(--border);background:var(--surface2);border-radius:var(--radius);padding:8px;display:flex;flex-direction:column;gap:6px}.pb-yaml-dock{border:.5px solid var(--border);border-radius:var(--radius-lg);background:var(--surface);margin-top:10px;overflow:hidden;flex-shrink:0}.pb-yaml-dock summary{padding:9px 12px;cursor:pointer;color:var(--text3);font-size:12px;background:var(--surface2)}.pb-yaml-dock pre{margin:0;padding:10px 12px;max-height:150px;overflow:auto;font-family:'Courier New',monospace;font-size:11px;color:var(--text2);white-space:pre}.pb-create-footer{display:flex;gap:8px;align-items:center;padding-top:10px;flex-shrink:0}.pb-create-footer label{margin:0}
+
+  
+    /* AGENT CREATOR TAB */
+    .app-tab-btn { padding: 6px 12px; border: .5px solid var(--border2); border-radius: 999px; background: transparent; color: var(--text2); font-size: 13px; cursor: pointer; display: inline-flex; gap: 6px; align-items: center; white-space: nowrap; }
+    .app-tab-btn:hover { background: var(--surface2); }
+    .app-tab-btn.active { background: var(--blue-bg); color: var(--blue-text); border-color: var(--blue-border); }
+    .creator-view { display: none; flex: 1; overflow: hidden; padding: 14px; gap: 14px; grid-template-columns: minmax(420px, 540px) minmax(420px, 1fr); }
+    .creator-view.active { display: grid; }
+    .ac-panel { background: var(--surface); border: .5px solid var(--border); border-radius: var(--radius-lg); display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+    .ac-head { padding: 12px 14px; border-bottom: .5px solid var(--border); background: var(--surface2); display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .ac-title { font-size: 13px; font-weight: 650; display: flex; gap: 7px; align-items: center; color: var(--text); }
+    .ac-body { padding: 14px; display: flex; flex-direction: column; gap: 12px; overflow: auto; }
+    .ac-field { display: flex; flex-direction: column; gap: 6px; }
+    .ac-field label { font-size: 12px; font-weight: 600; color: var(--text2); }
+    .ac-field small { font-size: 11px; color: var(--text3); line-height: 1.45; }
+    .ac-field input, .ac-field textarea, .ac-field select { width: 100%; padding: 9px 11px; border: .5px solid var(--border2); border-radius: var(--radius); background: var(--surface2); color: var(--text); font: inherit; font-size: 13px; outline: none; }
+    .ac-field textarea { min-height: 220px; resize: vertical; line-height: 1.5; }
+    .ac-field input:focus, .ac-field textarea:focus, .ac-field select:focus { border-color: var(--blue-border); box-shadow: 0 0 0 3px color-mix(in srgb, var(--blue-border) 20%, transparent); }
+    .ac-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .ac-check { font-size: 13px; color: var(--text2); display: flex; gap: 8px; align-items: center; }
+    .ac-actions { display: flex; gap: 8px; align-items: center; justify-content: flex-end; padding-top: 4px; }
+    .ac-status { font-size: 12px; color: var(--text3); margin-right: auto; white-space: pre-wrap; }
+    .ac-tabs { display: flex; gap: 6px; padding: 10px; background: var(--surface2); border-bottom: .5px solid var(--border); overflow: auto; }
+    .ac-tab { padding: 6px 10px; border: .5px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--text2); cursor: pointer; font-size: 12px; white-space: nowrap; }
+    .ac-tab.active { background: var(--blue-bg); color: var(--blue-text); border-color: var(--blue-border); }
+    .ac-preview { margin: 0; padding: 14px; white-space: pre; overflow: auto; font-family: 'Courier New', monospace; font-size: 12px; line-height: 1.55; color: var(--text2); height: 100%; }
+    .ac-toast { position: fixed; right: 18px; bottom: 18px; max-width: 560px; background: var(--surface); border: .5px solid var(--border2); border-radius: var(--radius-lg); box-shadow: 0 10px 34px rgba(0,0,0,.18); padding: 12px 14px; font-size: 13px; line-height: 1.45; display: none; white-space: pre-wrap; z-index: 500; }
+    .ac-toast.open { display: block; }
+    .ac-toast.err { border-color: var(--red); color: var(--red-text); }
+    @media (max-width: 980px) { .creator-view.active { grid-template-columns: 1fr; overflow: auto; } }
+
+  </style>
+</head>
+<body>
+
+<header>
+  <h1><i class="ti ti-topology-star-3"></i> Agent Explorer</h1>
+  <div class="discover-form">
+    <input class="url" id="base-url" placeholder="http://10.139.90.120" value="http://10.139.90.120" />
+    <span style="font-size:13px;color:var(--text3)">puertos</span>
+    <input style="width:70px" id="port-from" placeholder="9001" value="9001" />
+    <span style="font-size:13px;color:var(--text3)">—</span>
+    <input style="width:70px" id="port-to" placeholder="9100" value="9100" />
+    <button class="btn" onclick="discoverAgents()" id="discover-btn">
+      <i class="ti ti-radar"></i> Descubrir
+    </button>
+  </div>
+
+  <div style="display:flex;gap:6px;align-items:center">
+    <button class="app-tab-btn active" id="tab-explorer" onclick="switchMainTab('explorer')"><i class="ti ti-message"></i> Explorer</button>
+    <button class="app-tab-btn" id="tab-creator" onclick="switchMainTab('creator')"><i class="ti ti-robot"></i> Creador de agentes</button>
+  </div>
+</header>
+
+<div class="main" id="explorer-view">
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <span>Agentes</span>
+      <span id="agent-count" style="font-size:11px;color:var(--text3)"></span>
+    </div>
+    <div class="agents-list" id="agents-list">
+      <div class="empty-sidebar">Introduce la URL base y los puertos, luego pulsa Descubrir.</div>
+    </div>
+    <div class="sidebar-footer">
+      <button class="add-btn" onclick="openModal()">
+        <i class="ti ti-plus"></i> Añadir manualmente
+      </button>
+    </div>
+  </div>
+
+  <div class="chat-area">
+    <div class="agent-bar" id="agent-bar">
+      <div class="ab-name" id="ab-name"></div>
+      <div class="ab-desc" id="ab-desc"></div>
+      <div id="ab-caps"></div>
+      <div class="status-badge" id="ab-status"></div>
+      <button class="btn" onclick="openPlaybookModal()" title="Automatizaciones" id="automation-btn"><i class="ti ti-list-check" id="automation-btn-icon"></i> <span id="automation-btn-label">Playbooks</span></button>
+      <button class="btn" onclick="clearChat()" title="Limpiar conversación">
+        <i class="ti ti-trash"></i>
+      </button>
+    </div>
+
+    <div class="messages" id="messages">
+      <div class="welcome">
+        <i class="ti ti-topology-star-3"></i>
+        <p>Selecciona un agente para empezar</p>
+      </div>
+    </div>
+
+    <div class="extra-fields" id="extra-fields">
+      <div class="extra-fields-toggle" onclick="toggleExtraFields()">
+        <i class="ti ti-chevron-right" id="extra-toggle-icon"></i>
+        <span id="extra-toggle-label">Campos adicionales</span>
+      </div>
+      <div class="extra-fields-body" id="extra-fields-body" style="display:none"></div>
+    </div>
+    <div class="input-bar">
+      <textarea id="msg-input" placeholder="Escribe tu mensaje... (Enter para enviar, Shift+Enter para nueva línea)" rows="1" disabled
+        oninput="autoResize(this)"
+        onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage()}"
+      ></textarea>
+      <button class="btn primary" id="send-btn" onclick="sendMessage()" disabled>
+        <i class="ti ti-send"></i>
+      </button>
+    </div>
+  </div>
+</div>
+
+
+
+<div class="creator-view" id="agent-creator-view">
+  <section class="ac-panel">
+    <div class="ac-head"><div class="ac-title"><i class="ti ti-forms"></i> Datos del agente</div><button class="btn" onclick="acLoadToolProfiles()"><i class="ti ti-refresh"></i> Perfiles</button></div>
+    <div class="ac-body">
+      <div class="ac-field"><label>Agent Creator URL</label><input id="ac-creator-url" value="http://10.139.90.120:9097" /><small>Servicio backend que crea archivos en el proyecto. Debe estar arrancado con <code>python agent_creator_server.py</code>.</small></div>
+      <div class="ac-field"><label>Nombre del agente</label><input id="ac-agent-name" placeholder="mi_nuevo_agente" oninput="acSyncEnvHint()" /><small>Usa snake_case. Ejemplo: <code>ticket_enricher</code>.</small></div>
+      <div class="ac-field"><label>Descripción</label><input id="ac-description" placeholder="Describe qué hace el agente" /></div>
+      <div class="ac-row"><div class="ac-field"><label>Capabilities</label><input id="ac-capabilities" value="tool_executing, reporting" /></div><div class="ac-field"><label>Puerto</label><input id="ac-port" type="number" min="1" max="65535" placeholder="9020" /><small>Se usará en <code>start.sh</code> y en <code>agent_registry.json</code>.</small></div></div>
+      <div class="ac-field"><label>Variable de puerto</label><input id="ac-env-hint" disabled /></div>
+      <label class="ac-check"><input id="ac-use-tools" type="checkbox" onchange="acToggleTools()" /> Usar tools MCP</label>
+      <div class="ac-field" id="ac-tool-profile-wrap" style="display:none"><label>Perfil de tools</label><div style="display:flex;gap:8px"><select id="ac-tool-profile"><option value="">Cargando perfiles...</option></select><button class="btn" type="button" onclick="acLoadToolProfiles()">Actualizar</button></div><small>Perfiles leídos desde <code>agent_config.yaml</code>. Se usará en <code>manager.get_tools_for_agent(&quot;perfil&quot;)</code>.</small></div>
+      <div class="ac-field"><label>Prompt</label><textarea id="ac-prompt" placeholder="Pega aquí el system prompt..."></textarea></div>
+      <label class="ac-check"><input id="ac-overwrite" type="checkbox" /> Sobrescribir si ya existe</label>
+      <div class="ac-actions"><span class="ac-status" id="ac-status">Listo</span><button class="btn" onclick="acPreviewAgent()"><i class="ti ti-eye"></i> Preview</button><button class="btn primary" onclick="acCreateAgent()"><i class="ti ti-sparkles"></i> Crear agente</button></div>
+    </div>
+  </section>
+  <section class="ac-panel"><div class="ac-head"><div class="ac-title"><i class="ti ti-code"></i> Preview de archivos</div></div><div class="ac-tabs" id="ac-tabs"></div><pre class="ac-preview" id="ac-preview">Pulsa Preview para ver los archivos generados.</pre></section>
+</div>
+<div class="ac-toast" id="ac-toast"></div>
+
+<div class="modal-overlay" id="playbook-modal">
+  <div class="modal wide pb-flow-modal" style="width:1180px;max-width:98vw;height:90vh;max-height:92vh;overflow:hidden">
+    <h2 id="automation-modal-title"><i class="ti ti-list-check"></i> Playbooks</h2>
+    <div class="pb-tabs">
+      <button class="pb-tab active" id="pb-tab-run-btn" onclick="switchPbTab('run')">Ejecutar</button>
+      <button class="pb-tab" id="pb-tab-create-btn" onclick="switchPbTab('create')">Crear / Editar</button>
+    </div>
+    <div class="pb-section active" id="pb-tab-run">
+      <p id="pb-run-help" style="font-size:12px;color:var(--text3);margin-bottom:8px">Selecciona un playbook para ejecutarlo con el mensaje del input</p>
+      <div class="playbook-list" id="pb-list"><p style="font-size:12px;color:var(--text3)">Cargando...</p></div>
+    </div>
+    <div class="pb-section" id="pb-tab-create">
+      <div class="pb-flow-topbar"><input id="pb-name" class="pb-flow-input" placeholder="Nombre del playbook *" oninput="pbYamlPreview()" /><input id="pb-desc" class="pb-flow-input" placeholder="Descripción (opcional)" oninput="pbYamlPreview()" /><div class="pb-flow-actions"><button class="btn" onclick="pbAutoLayout()"><i class="ti ti-layout-board-split"></i> Auto-layout</button><button class="btn" onclick="pbClearBuilder()"><i class="ti ti-eraser"></i></button></div></div>
+      <div class="pb-flow-workbench"><aside class="pb-flow-panel"><div class="pb-flow-panel-head"><div><div class="pb-flow-panel-title"><i class="ti ti-plug-connected"></i> Agentes</div><div class="pb-flow-panel-sub">Arrastra o pulsa para añadir</div></div><button class="pb-mini-btn" onclick="pbRenderPalette()"><i class="ti ti-refresh"></i></button></div><input class="pb-agent-search" id="pb-agent-search" placeholder="Buscar agente..." oninput="pbRenderPalette()" /><div class="pb-agent-palette" id="pb-agent-palette"></div></aside>
+      <section class="pb-flow-canvas-wrap"><div class="pb-flow-canvas-toolbar"><button class="pb-mini-btn" onclick="pbAddStep()" title="Añadir nodo simple"><i class="ti ti-plus"></i></button><button class="pb-mini-btn" onclick="pbAddParallelStep()" title="Añadir nodo paralelo"><i class="ti ti-git-branch"></i></button><button class="pb-mini-btn" onclick="pbAutoLayout()" title="Auto-layout"><i class="ti ti-route"></i></button></div><div class="pb-flow-canvas-toolbar zoom"><button class="pb-mini-btn" onclick="pbZoomOut()" title="Alejar"><i class="ti ti-minus"></i></button><span class="pb-zoom-indicator" id="pb-zoom-label">100%</span><button class="pb-mini-btn" onclick="pbZoomIn()" title="Acercar"><i class="ti ti-plus"></i></button><button class="pb-mini-btn" onclick="pbZoomReset()" title="100%"><i class="ti ti-zoom-reset"></i></button><button class="pb-mini-btn" onclick="pbZoomFit()" title="Ajustar a pantalla"><i class="ti ti-arrows-maximize"></i></button></div><div class="pb-flow-canvas" id="pb-flow-canvas" ondragover="pbCanvasDragOver(event)" ondrop="pbCanvasDrop(event)"><div class="pb-flow-plane" id="pb-flow-plane"><svg class="pb-flow-svg" id="pb-flow-svg"></svg><div id="pb-canvas"></div></div></div></section>
+      <aside class="pb-flow-panel"><div class="pb-flow-panel-head"><div><div class="pb-flow-panel-title"><i class="ti ti-adjustments"></i> Inspector</div><div class="pb-flow-panel-sub" id="pb-inspector-sub">Selecciona un nodo</div></div></div><div class="pb-inspector-body" id="pb-inspector"></div></aside></div>
+      <details class="pb-yaml-dock"><summary><i class="ti ti-code"></i> Ver YAML generado</summary><pre id="pb-yaml-preview">—</pre></details><div class="pb-create-footer"><label style="font-size:12px;color:var(--text3);display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" id="pb-persist" /> Guardar en disco</label><div style="flex:1"></div><button class="btn" onclick="pbSave()"><i class="ti ti-device-floppy"></i> Guardar</button><button class="btn primary" onclick="pbRunNow()"><i class="ti ti-player-play"></i> Ejecutar ahora</button></div>
+    </div>
+    <div class="modal-actions" style="margin-top:1rem">
+      <button class="btn" onclick="closePlaybookModal()">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="pb-input-modal">
+  <div class="modal pb-input-dialog">
+    <div class="pb-input-head">
+      <div class="pb-input-icon"><i class="ti ti-player-play"></i></div>
+      <div>
+        <div class="pb-input-title" id="pb-input-title">Ejecutar playbook</div>
+        <div class="pb-input-subtitle" id="pb-input-subtitle">Introduce el dato de entrada que usará el playbook.</div>
+      </div>
+    </div>
+    <div class="pb-input-body">
+      <label for="pb-input-text"><span>Input del playbook</span><span>Ctrl/⌘ + Enter para ejecutar</span></label>
+      <textarea id="pb-input-text" class="pb-input-textarea" placeholder="Escribe aquí el input para el playbook..." onkeydown="pbInputKeydown(event)"></textarea>
+      <div class="pb-input-error" id="pb-input-error"></div>
+    </div>
+    <div class="pb-input-actions">
+      <button class="btn" onclick="pbInputCancel()">Cancelar</button>
+      <button class="btn primary" onclick="pbInputAccept()"><i class="ti ti-player-play"></i> Ejecutar</button>
+    </div>
+  </div>
+</div>
+<div class="modal-overlay" id="pb-delete-modal">
+  <div class="modal pb-delete-dialog">
+    <div class="pb-delete-head">
+      <div class="pb-delete-icon"><i class="ti ti-trash"></i></div>
+      <div>
+        <div class="pb-delete-title">Eliminar playbook</div>
+        <div class="pb-delete-subtitle">Esta acción eliminará el playbook seleccionado del agente playbook_runner.</div>
+      </div>
+    </div>
+    <div class="pb-delete-name" id="pb-delete-name">—</div>
+    <div class="pb-delete-actions">
+      <button class="btn" onclick="pbDeleteCancel()">Cancelar</button>
+      <button class="btn danger" onclick="pbDeleteAccept()"><i class="ti ti-trash"></i> Eliminar</button>
+    </div>
+  </div>
+</div>
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <h2><i class="ti ti-plug"></i> Añadir agente</h2>
+    <label>Nombre</label>
+    <input id="m-name" placeholder="mi_agente" />
+    <label>URL completa</label>
+    <input id="m-url" placeholder="http://localhost:9001" />
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal()">Cancelar</button>
+      <button class="btn primary" onclick="addManual()"><i class="ti ti-check"></i> Añadir</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let agents = {};
+let selected = null;
+let histories = {};
+let isLoading = false;
+let extraFieldsOpen = false;
+
+function autoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+}
+
+// --- EXTRA FIELDS ---
+
+function toggleExtraFields() {
+  extraFieldsOpen = !extraFieldsOpen;
+  document.getElementById('extra-fields-body').style.display = extraFieldsOpen ? 'flex' : 'none';
+  document.getElementById('extra-toggle-icon').className = extraFieldsOpen ? 'ti ti-chevron-down' : 'ti ti-chevron-right';
+}
+
+function renderExtraFields(schema) {
+  const panel = document.getElementById('extra-fields');
+  const body = document.getElementById('extra-fields-body');
+  const label = document.getElementById('extra-toggle-label');
+
+  if (!schema || !schema.properties) {
+    panel.classList.remove('visible');
+    return;
+  }
+
+  const props = schema.properties;
+  const required = schema.required || [];
+  // Excluye 'messages' — ese es el input principal
+  const extraKeys = Object.keys(props).filter(k => k !== 'messages' && k !== 'message');
+
+  if (!extraKeys.length) {
+    panel.classList.remove('visible');
+    return;
+  }
+
+  label.textContent = `Campos adicionales (${extraKeys.length})`;
+  panel.classList.add('visible');
+
+  body.innerHTML = extraKeys.map(key => {
+    const prop = props[key];
+    const isRequired = required.includes(key);
+    const defaultVal = prop.default !== undefined ? prop.default : '';
+    const typeLabel = prop.type || 'any';
+    const isLong = typeLabel === 'object' || typeLabel === 'array' || (typeof defaultVal === 'string' && defaultVal.length > 40);
+
+    const inputEl = isLong
+      ? `<textarea id="field-${key}" rows="2" placeholder="${defaultVal !== '' ? JSON.stringify(defaultVal) : 'vacío'}">${defaultVal !== '' ? JSON.stringify(defaultVal) : ''}</textarea>`
+      : `<input id="field-${key}" type="text" value="${defaultVal !== '' ? defaultVal : ''}" placeholder="${defaultVal !== '' ? defaultVal : 'vacío'}" />`;
+
+    return `<div class="extra-field-row">
+      <label>${key}${isRequired ? ' *' : ''}</label>
+      ${inputEl}
+      <span class="field-type">${typeLabel}</span>
+    </div>`;
+  }).join('');
+}
+
+function getExtraFieldsValues(schema) {
+  if (!schema || !schema.properties) return {};
+  const props = schema.properties;
+  const extraKeys = Object.keys(props).filter(k => k !== 'messages' && k !== 'message');
+  const result = {};
+  extraKeys.forEach(key => {
+    const el = document.getElementById(`field-${key}`);
+    if (!el) return;
+    const val = el.value.trim();
+    const prop = props[key];
+    const type = prop.type;
+    if (val === '') {
+      // Usa el default
+      result[key] = prop.default !== undefined ? prop.default : null;
+    } else if (type === 'integer' || type === 'number') {
+      result[key] = Number(val);
+    } else if (type === 'boolean') {
+      result[key] = val === 'true';
+    } else if (type === 'array' || type === 'object') {
+      try { result[key] = JSON.parse(val); } catch { result[key] = val; }
+    } else {
+      result[key] = val;
+    }
+  });
+  return result;
+}
+
+// --- DISCOVER ---
+
+async function discoverAgents() {
+  const base = document.getElementById('base-url').value.trim().replace(/\/$/, '');
+  const from = parseInt(document.getElementById('port-from').value.trim());
+  const to   = parseInt(document.getElementById('port-to').value.trim());
+
+  if (isNaN(from) || isNaN(to) || from > to) {
+    alert('Rango de puertos inválido');
+    return;
+  }
+
+  const btn = document.getElementById('discover-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> Escaneando...';
+
+  if (!document.querySelector('style[data-spin]')) {
+    const style = document.createElement('style');
+    style.setAttribute('data-spin', '1');
+    style.textContent = '@keyframes spin { to { transform: rotate(360deg); } }';
+    document.head.appendChild(style);
+  }
+
+  agents = {};
+  const ports = Array.from({ length: to - from + 1 }, (_, i) => from + i).filter(port => port !== 9097);
+  const results = await Promise.all(ports.map(async port => {
+    const url = `${base}:${port}`;
+    try {
+      const r = await fetch(`${url}/.well-known/agent.json`, { signal: AbortSignal.timeout(3000) });
+      if (!r.ok) return { name: null, url, port, ok: false };
+      const card = await r.json();
+      return { name: card.name || `agente-${port}`, url, port, ok: true, card };
+    } catch {
+      return { name: null, url, port, ok: false };
+    }
+  }));
+
+  results.forEach(({ name, url, port, ok, card }) => {
+    if (ok && name) agents[name] = { url, port, ok, card };
+  });
+
+  btn.disabled = false;
+  btn.innerHTML = '<i class="ti ti-radar"></i> Descubrir';
+  renderSidebar();
+
+  const found = results.filter(r => r.ok).length;
+  const total = ports.length;
+  if (selected) addSystemMsg(`Escaneados ${total} puertos — ${found} agente${found !== 1 ? 's' : ''} encontrado${found !== 1 ? 's' : ''}`);
+}
+
+// --- SIDEBAR ---
+
+function renderSidebar() {
+  const list = document.getElementById('agents-list');
+  const names = Object.keys(agents);
+  document.getElementById('agent-count').textContent = names.length ? `${names.length}` : '';
+
+  if (!names.length) {
+    list.innerHTML = '<div class="empty-sidebar">No se encontró ningún agente en ese rango de puertos.</div>';
+    return;
+  }
+
+  list.innerHTML = names.map(name => {
+    const a = agents[name];
+    const active = selected === name ? 'active' : '';
+    const status = a.ok ? 'ok' : 'err';
+    return `<div class="agent-item ${active} ${status}" onclick="selectAgent('${name}')">
+      <span class="dot"></span>
+      <span class="name">${name}</span>
+      <span class="port-tag">:${a.port}</span>
+    </div>`;
+  }).join('');
+}
+
+// --- SELECT AGENT ---
+
+
+function selectedAgentKind() {
+  const cardName = agents[selected]?.card?.name || selected || '';
+  if (cardName === 'workflow_runner') return 'workflow';
+  if (cardName === 'playbook_runner') return 'playbook';
+  return 'generic';
+}
+function updateAutomationButtonForSelectedAgent() {
+  const label = document.getElementById('automation-btn-label');
+  const icon = document.getElementById('automation-btn-icon');
+  const btn = document.getElementById('automation-btn');
+  if (!label || !icon || !btn) return;
+  const kind = selectedAgentKind();
+  if (kind === 'workflow') {
+    label.textContent = 'Workflows';
+    icon.className = 'ti ti-route';
+    btn.title = 'Workflows';
+  } else {
+    label.textContent = 'Playbooks';
+    icon.className = 'ti ti-list-check';
+    btn.title = 'Playbooks';
+  }
+}
+function configureAutomationModal(kind) {
+  const title = document.getElementById('automation-modal-title');
+  const runBtn = document.getElementById('pb-tab-run-btn');
+  const createBtn = document.getElementById('pb-tab-create-btn');
+  const runHelp = document.getElementById('pb-run-help');
+  if (title) title.innerHTML = kind === 'workflow'
+    ? '<i class="ti ti-route"></i> Workflows'
+    : '<i class="ti ti-list-check"></i> Playbooks';
+  if (runBtn) runBtn.textContent = kind === 'workflow' ? 'Workflows' : 'Ejecutar';
+  if (createBtn) createBtn.style.display = kind === 'workflow' ? 'none' : '';
+  if (runHelp) runHelp.textContent = kind === 'workflow'
+    ? 'Selecciona un workflow para ejecutarlo con el mensaje del input'
+    : 'Selecciona un playbook para ejecutarlo con el mensaje del input';
+  switchPbTab('run');
+}
+function selectAgent(name) {
+  selected = name;
+  if (!histories[name]) histories[name] = [];
+  renderSidebar();
+
+  const a = agents[name];
+  const bar = document.getElementById('agent-bar');
+  bar.classList.add('visible');
+  document.getElementById('ab-name').textContent = name;
+  document.getElementById('ab-desc').textContent = a.card?.description || a.url;
+
+  const caps = (a.card?.capabilities || []);
+  document.getElementById('ab-caps').innerHTML = caps.map(c =>
+    `<span class="cap-badge">${c}</span>`).join(' ');
+
+  const statusEl = document.getElementById('ab-status');
+  if (a.ok) {
+    statusEl.className = 'status-badge ok';
+    statusEl.innerHTML = '<i class="ti ti-circle-check" style="font-size:13px"></i> activo';
+  } else {
+    statusEl.className = 'status-badge err';
+    statusEl.innerHTML = '<i class="ti ti-circle-x" style="font-size:13px"></i> inactivo';
+  }
+
+  updateAutomationButtonForSelectedAgent();
+
+  // Renderiza campos extra del input_schema
+  renderExtraFields(a.card?.input_schema || null);
+
+  const input = document.getElementById('msg-input');
+  input.disabled = false;
+  document.getElementById('send-btn').disabled = false;
+  input.focus();
+  renderMessages();
+}
+
+// --- MESSAGES ---
+
+function renderMessages() {
+  const box = document.getElementById('messages');
+  const hist = histories[selected] || [];
+
+  if (!hist.length) {
+    const a = agents[selected];
+    box.innerHTML = `<div class="welcome">
+      <i class="ti ti-message-dots"></i>
+      <p>Conversación con <strong>${selected}</strong></p>
+      <p style="font-size:12px">${a?.url || ''}</p>
+    </div>`;
+    return;
+  }
+
+  box.innerHTML = hist.map(m => {
+    if (m.role === 'typing') {
+      return `<div class="msg-row agent">
+        <div class="bubble agent"><div class="typing"><span></span><span></span><span></span></div></div>
+      </div>`;
+    }
+    if (m.role === 'system') {
+      return `<div class="msg-row system"><div class="bubble system">${m.content}</div></div>`;
+    }
+    // Orchestrator — resultados por agente
+    if (m.role === 'orchestrator') {
+      const reasoning = m.reasoning ? `<div class="orch-reasoning">💭 ${escapeHtml(m.reasoning)}</div>` : '';
+      const results = (m.results || []).map(r => `
+        <div class="orch-agent-result">
+          <div class="orch-agent-header">
+            <span class="${r.ok ? 'ok' : 'err'}">${r.ok ? '✓' : '✗'}</span>
+            <span>${escapeHtml(r.agent)}</span>
+          </div>
+          <div class="orch-agent-content">${marked.parse(String(r.result || ''))}</div>
+        </div>`).join('');
+      return `<div class="msg-row agent">
+        <div class="msg-label">${selected}</div>
+        <div class="orch-bubble">${reasoning}${results}</div>
+      </div>`;
+    }
+    // Playbook — traza por pasos
+    if (m.role === 'playbook') {
+      const steps = (m.trace || []).map(t => {
+        let out = t.result?.output;
+        if (typeof out === 'object') out = JSON.stringify(out, null, 2);
+        else out = String(out || '');
+        // Pasos paralelos: muestra cada sub-agente
+        const subAgents = Object.entries(t.result || {})
+          .filter(([k]) => k !== 'output' && k !== 'ok')
+          .map(([agentName, agentResult]) => {
+            let subOut = agentResult?.output;
+            if (typeof subOut === 'object') subOut = JSON.stringify(subOut, null, 2);
+            return `<div style="margin-top:6px;padding-top:6px;border-top:0.5px solid var(--border)">
+              <span style="font-size:11px;font-weight:500;color:var(--text3)">${agentName}</span>
+              <div style="font-size:12px;margin-top:2px">${marked.parse(String(subOut || ''))}</div>
+            </div>`;
+          }).join('');
+        return `<div class="trace-step">
+          <div class="trace-step-header">
+            <span class="${t.ok ? 'ok' : 'err'}">${t.ok ? '✓' : '✗'}</span>
+            <span>${t.id}</span>
+          </div>
+          <div class="trace-step-content">${subAgents || marked.parse(out)}</div>
+        </div>`;
+      }).join('');
+      return `<div class="msg-row agent">
+        <div class="msg-label">▶ ${m.playbook || 'playbook'}</div>
+        <div class="trace-bubble">${steps}</div>
+      </div>`;
+    }
+    const label = m.role === 'user' ? 'Tú' : selected;
+    const content = m.role === 'agent'
+      ? marked.parse(m.content || '')
+      : escapeHtml(m.content);
+    return `<div class="msg-row ${m.role}">
+      <div class="msg-label">${label}</div>
+      <div class="bubble ${m.role}">${content}</div>
+    </div>`;
+  }).join('');
+
+  box.scrollTop = box.scrollHeight;
+}
+
+function escapeHtml(str) {
+  return String(str ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function escapeJsString(str) {
+  return String(str ?? '').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\r/g, '\\r').replace(/\n/g, '\\n');
+}
+
+function addSystemMsg(text) {
+  if (selected) {
+    histories[selected].push({ role: 'system', content: text });
+    renderMessages();
+  }
+}
+
+// --- SEND ---
+
+async function sendMessage() {
+  if (!selected || isLoading) return;
+  const input = document.getElementById('msg-input');
+  const msg = input.value.trim();
+  if (!msg) return;
+
+  isLoading = true;
+  input.value = '';
+  input.style.height = 'auto';
+  input.disabled = true;
+  document.getElementById('send-btn').disabled = true;
+
+  histories[selected].push({ role: 'user', content: msg });
+  histories[selected].push({ role: 'typing' });
+  renderMessages();
+
+  const a = agents[selected];
+  const schema = a.card?.input_schema || null;
+  const extraFields = getExtraFieldsValues(schema);
+
+  // Construye el body: messages es siempre el texto del usuario,
+  // el resto viene de los campos extra
+  const body = {
+    messages: msg,   // el agente recibe el mensaje principal
+    ...extraFields,  // campos extra con sus valores (o defaults)
+  };
+
+  try {
+    const r = await fetch(`${a.url}/tasks/send`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(240000)
+    });
+    histories[selected] = histories[selected].filter(m => m.role !== 'typing');
+    if (!r.ok) {
+      const err = await r.text();
+      histories[selected].push({ role: 'error', content: `HTTP ${r.status}: ${err}` });
+    } else {
+      const data = await r.json();
+      if (data.agent === 'orchestrator' && data.results) {
+        histories[selected].push({ role: 'orchestrator', reasoning: data.reasoning || '', results: data.results });
+      } else {
+        histories[selected].push({ role: 'agent', content: data.result });
+      }
+    }
+  } catch (e) {
+    histories[selected] = histories[selected].filter(m => m.role !== 'typing');
+    const errMsg = e.name === 'TimeoutError' ? 'Timeout: el agente tardó demasiado en responder' : `Error de conexión: ${e.message}`;
+    histories[selected].push({ role: 'error', content: errMsg });
+  }
+
+  isLoading = false;
+  input.disabled = false;
+  document.getElementById('send-btn').disabled = false;
+  input.focus();
+  renderMessages();
+}
+
+function clearChat() {
+  if (selected) {
+    histories[selected] = [];
+    renderMessages();
+  }
+}
+
+// --- MODAL ---
+
+function openModal() {
+  document.getElementById('modal').classList.add('open');
+  setTimeout(() => document.getElementById('m-name').focus(), 50);
+}
+function closeModal() {
+  document.getElementById('modal').classList.remove('open');
+  document.getElementById('m-name').value = '';
+  document.getElementById('m-url').value = '';
+}
+async function addManual() {
+  const name = document.getElementById('m-name').value.trim();
+  const url = document.getElementById('m-url').value.trim().replace(/\/$/, '');
+  if (!name || !url) return;
+  const port = url.split(':').pop();
+  let ok = false, card = null;
+  try {
+    const r = await fetch(`${url}/.well-known/agent.json`, { signal: AbortSignal.timeout(4000) });
+    ok = r.ok;
+    if (ok) card = await r.json();
+  } catch {}
+  agents[name] = { url, port, ok, card };
+  closeModal();
+  renderSidebar();
+  selectAgent(name);
+}
+
+document.getElementById('modal').addEventListener('click', e => {
+  if (e.target === document.getElementById('modal')) closeModal();
+});
+document.getElementById('playbook-modal').addEventListener('click', e => {
+  if (e.target === document.getElementById('playbook-modal')) closePlaybookModal();
+});
+document.getElementById('pb-input-modal').addEventListener('click', e => {
+  if (e.target === document.getElementById('pb-input-modal')) pbInputCancel();
+});
+document.getElementById('pb-delete-modal').addEventListener('click', e => {
+  if (e.target === document.getElementById('pb-delete-modal')) pbDeleteCancel();
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { closeModal(); closePlaybookModal(); pbInputCancel(); pbDeleteCancel(); }
+});
+
+// --- PLAYBOOK ---
+
+let pbPlaybooks = {};
+
+async function openPlaybookModal() {
+  if (!selected) return;
+  const kind = selectedAgentKind();
+  configureAutomationModal(kind);
+  document.getElementById('playbook-modal').classList.add('open');
+  await loadPlaybooks();
+  if (kind === 'playbook') setTimeout(() => { pbBindFlowWheel(); pbRender(); pbApplyZoom(); }, 0);
+}
+
+
+function closePlaybookModal() {
+  document.getElementById('playbook-modal').classList.remove('open');
+}
+
+function switchPbTab(tab) {
+  document.querySelectorAll('.pb-tab').forEach((t, i) => {
+    t.classList.toggle('active', ['run','create'][i] === tab);
+  });
+  document.getElementById('pb-tab-run').classList.toggle('active', tab === 'run');
+  document.getElementById('pb-tab-create').classList.toggle('active', tab === 'create');
+  if (tab === 'create') setTimeout(() => { pbBindFlowWheel(); pbRender(); pbApplyZoom(); }, 0);
+}
+
+
+// --- PLAYBOOK INPUT MODAL ---
+let pbInputResolver = null;
+function pbOpenInputModal(playbookLabel, initialValue = '') {
+  return new Promise(resolve => {
+    pbInputResolver = resolve;
+    const modal = document.getElementById('pb-input-modal');
+    const title = document.getElementById('pb-input-title');
+    const subtitle = document.getElementById('pb-input-subtitle');
+    const text = document.getElementById('pb-input-text');
+    const error = document.getElementById('pb-input-error');
+    title.textContent = `Ejecutar: ${playbookLabel}`;
+    subtitle.textContent = 'Introduce el dato de entrada que recibirá el playbook. Puedes revisar o editar el texto antes de ejecutarlo.';
+    text.value = initialValue || '';
+    error.textContent = '';
+    modal.classList.add('open');
+    setTimeout(() => { text.focus(); if (text.value) text.select(); }, 60);
+  });
+}
+function pbResolveInputModal(value) {
+  document.getElementById('pb-input-modal').classList.remove('open');
+  const resolve = pbInputResolver;
+  pbInputResolver = null;
+  if (resolve) resolve(value);
+}
+function pbInputCancel() { if (pbInputResolver) pbResolveInputModal(null); }
+function pbInputAccept() {
+  const text = document.getElementById('pb-input-text');
+  const error = document.getElementById('pb-input-error');
+  const value = text.value.trim();
+  if (!value) { error.textContent = 'Introduce un input para ejecutar el playbook.'; text.focus(); return; }
+  pbResolveInputModal(value);
+}
+function pbInputKeydown(e) {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); pbInputAccept(); }
+}
+// --- PLAYBOOK DELETE MODAL ---
+let pbDeleteResolver = null;
+function pbOpenDeleteModal(playbookLabel) {
+  return new Promise(resolve => {
+    pbDeleteResolver = resolve;
+    document.getElementById('pb-delete-name').textContent = playbookLabel;
+    document.getElementById('pb-delete-modal').classList.add('open');
+  });
+}
+function pbResolveDeleteModal(value) {
+  document.getElementById('pb-delete-modal').classList.remove('open');
+  const resolve = pbDeleteResolver;
+  pbDeleteResolver = null;
+  if (resolve) resolve(value);
+}
+function pbDeleteCancel() { if (pbDeleteResolver) pbResolveDeleteModal(false); }
+function pbDeleteAccept() { pbResolveDeleteModal(true); }
+async function loadPlaybooks() {
+  const list = document.getElementById('pb-list');
+  const kind = selectedAgentKind();
+
+  if (kind === 'workflow') {
+    const runner = agents[selected];
+    if (!runner) {
+      list.innerHTML = '<p style="font-size:12px;color:var(--red)">No se encontró el agente workflow_runner.</p>';
+      return;
+    }
+    try {
+      const r = await fetch(`${runner.url}/workflows`, { signal: AbortSignal.timeout(15000) });
+      const data = await r.json();
+      const keys = Array.isArray(data) ? data : Object.keys(data || {});
+      if (!keys.length) {
+        list.innerHTML = '<p style="font-size:12px;color:var(--text3)">No hay workflows en workflow_runner.</p>';
+        return;
+      }
+      list.innerHTML = keys.map(k => {
+        const meta = Array.isArray(data) ? {} : (data[k] || {});
+        const jsKey = escapeJsString(k);
+        const displayName = escapeHtml(meta.name || k);
+        const desc = meta.description || meta.module ? `<div class="pb-desc">${escapeHtml(meta.description || ('Módulo: ' + meta.module))}</div>` : '';
+        return `<div class="playbook-item">
+          <div class="pb-run-area" onclick="runWorkflow('${jsKey}')" title="Ejecutar workflow">
+            <div class="pb-run-main"><div class="pb-name">${displayName}</div>${desc}</div>
+            <span class="pb-steps">workflow</span>
+            <i class="ti ti-player-play" style="font-size:13px;color:var(--text3)"></i>
+          </div>
+        </div>`;
+      }).join('');
+    } catch(e) {
+      list.innerHTML = `<p style="font-size:12px;color:var(--red)">Error cargando workflows: ${escapeHtml(e.message)}</p>`;
+    }
+    return;
+  }
+
+  const runner = Object.values(agents).find(a => a.card?.name === 'playbook_runner');
+  if (!runner) {
+    list.innerHTML = '<p style="font-size:12px;color:var(--red)">No se encontró el agente playbook_runner.</p>';
+    return;
+  }
+  try {
+    const r = await fetch(`${runner.url}/playbooks`);
+    pbPlaybooks = await r.json();
+    const keys = Object.keys(pbPlaybooks);
+    if (!keys.length) {
+      list.innerHTML = '<p style="font-size:12px;color:var(--text3)">No hay playbooks. Créalos en "Crear / Editar".</p>';
+      return;
+    }
+    list.innerHTML = keys.map(k => {
+      const pb = pbPlaybooks[k];
+      const jsKey = escapeJsString(k);
+      const displayName = escapeHtml(pb.name || k);
+      const desc = pb.description ? `<div class="pb-desc">${escapeHtml(pb.description)}</div>` : '';
+      const steps = Number(pb.steps || 0);
+      return `<div class="playbook-item">
+        <div class="pb-run-area" onclick="runPlaybook('${jsKey}')" title="Ejecutar playbook">
+          <div class="pb-run-main"><div class="pb-name">${displayName}</div>${desc}</div>
+          <span class="pb-steps">${steps} paso${steps !== 1 ? 's' : ''}</span>
+          <i class="ti ti-player-play" style="font-size:13px;color:var(--text3)"></i>
+        </div>
+        <button class="pb-del-btn" onclick="deletePlaybook('${jsKey}', event)" title="Eliminar playbook">
+          <i class="ti ti-trash"></i>
+        </button>
+      </div>`;
+    }).join('');
+  } catch(e) {
+    list.innerHTML = `<p style="font-size:12px;color:var(--red)">Error: ${escapeHtml(e.message)}</p>`;
+  }
+}
+async function pbDeleteRequest(runner, name) {
+  const encoded = encodeURIComponent(name);
+  const jsonHeaders = { 'Content-Type': 'application/json' };
+  const attempts = [
+    // Preferimos POST porque muchos backends internos no exponen DELETE desde navegador/proxy.
+    { label: 'POST /playbooks/delete {playbook_name}', url: `${runner.url}/playbooks/delete`, opts: { method: 'POST', headers: jsonHeaders, body: JSON.stringify({ playbook_name: name, persist: true }) } },
+    { label: 'POST /playbooks/delete {name}', url: `${runner.url}/playbooks/delete`, opts: { method: 'POST', headers: jsonHeaders, body: JSON.stringify({ name, persist: true }) } },
+    { label: 'POST /playbooks/remove', url: `${runner.url}/playbooks/remove`, opts: { method: 'POST', headers: jsonHeaders, body: JSON.stringify({ playbook_name: name, name, persist: true }) } },
+    { label: 'POST /playbooks/{name}/delete', url: `${runner.url}/playbooks/${encoded}/delete`, opts: { method: 'POST', headers: jsonHeaders, body: JSON.stringify({ persist: true }) } },
+    { label: 'POST /playbooks/{name}/remove', url: `${runner.url}/playbooks/${encoded}/remove`, opts: { method: 'POST', headers: jsonHeaders, body: JSON.stringify({ persist: true }) } },
+    { label: 'DELETE /playbooks/{name}', url: `${runner.url}/playbooks/${encoded}`, opts: { method: 'DELETE' } },
+    { label: 'DELETE /playbooks?name=', url: `${runner.url}/playbooks?name=${encoded}`, opts: { method: 'DELETE' } },
+  ];
+  const errors = [];
+  for (const a of attempts) {
+    try {
+      const r = await fetch(a.url, { ...a.opts, signal: AbortSignal.timeout(20000) });
+      const text = await r.text();
+      let data = null;
+      if (text) { try { data = JSON.parse(text); } catch { data = null; } }
+      if (r.ok && (!data || data.ok !== false)) return { ok: true, data, endpoint: a.label };
+      const msg = (data && (data.error || data.detail || data.message)) || text || `HTTP ${r.status}`;
+      errors.push(`${a.label}: ${msg}`);
+    } catch (e) {
+      errors.push(`${a.label}: ${e.name === 'TimeoutError' ? 'Timeout' : e.message}`);
+    }
+  }
+  const methodNotAllowed = errors.some(x => /method not allowed|405/i.test(x));
+  const hint = methodNotAllowed
+    ? 'El agente playbook_runner responde 405 Method Not Allowed: la API actual no expone una ruta de borrado compatible. Hay que añadir en el backend POST /playbooks/delete o DELETE /playbooks/{name}.'
+    : 'No se encontró una ruta de borrado compatible en playbook_runner.';
+  return { ok: false, error: `${hint}\n\nIntentos realizados:\n- ${errors.join('\n- ')}` };
+}
+async function deletePlaybook(name, event) {
+  if (event) { event.preventDefault(); event.stopPropagation(); }
+  const runner = Object.values(agents).find(a => a.card?.name === 'playbook_runner');
+  if (!runner) { alert('No se encontró el agente playbook_runner'); return; }
+  const displayName = (pbPlaybooks[name]?.name || name);
+  const confirmed = await pbOpenDeleteModal(displayName);
+  if (!confirmed) return;
+  const list = document.getElementById('pb-list');
+  list.innerHTML = `<p style="font-size:12px;color:var(--text3)"><i class="ti ti-loader-2"></i> Eliminando "${escapeHtml(displayName)}"...</p>`;
+  const result = await pbDeleteRequest(runner, name);
+  if (result.ok) {
+    delete pbPlaybooks[name];
+    await loadPlaybooks();
+    addSystemMsg(`Playbook "${displayName}" eliminado${result.endpoint ? ' vía ' + result.endpoint : ''}`);
+  } else {
+    list.innerHTML = `<p style="font-size:12px;color:var(--red);white-space:pre-wrap">No se pudo eliminar "${escapeHtml(displayName)}":\n${escapeHtml(result.error)}</p>
+      <button class="btn" style="margin-top:8px" onclick="loadPlaybooks()"><i class="ti ti-refresh"></i> Recargar lista</button>`;
+  }
+}
+
+async function runWorkflow(name) {
+  closePlaybookModal();
+  const runner = agents[selected];
+  if (!runner || runner.card?.name !== 'workflow_runner') { alert('Selecciona el agente workflow_runner'); return; }
+  const inputEl = document.getElementById('msg-input');
+  const initialValue = inputEl.value.trim();
+  const userMsg = await pbOpenInputModal(name, initialValue);
+  if (!userMsg) return;
+  inputEl.value = '';
+  inputEl.style.height = 'auto';
+  await _executeWorkflow(runner, userMsg, name);
+}
+async function _executeWorkflow(runner, userMsg, workflowName) {
+  isLoading = true;
+  document.getElementById('msg-input').disabled = true;
+  document.getElementById('send-btn').disabled = true;
+  histories[selected].push({ role: 'user', content: `⚙ Workflow: ${workflowName}\n${userMsg}` });
+  histories[selected].push({ role: 'typing' });
+  renderMessages();
+  try {
+    const r = await fetch(`${runner.url}/tasks/send`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages: userMsg, workflow_name: workflowName }),
+      signal: AbortSignal.timeout(3000000)
+    });
+    histories[selected] = histories[selected].filter(m => m.role !== 'typing');
+    if (!r.ok) {
+      const err = await r.text();
+      histories[selected].push({ role: 'error', content: `HTTP ${r.status}: ${err}` });
+    } else {
+      const data = await r.json();
+      histories[selected].push({ role: 'agent', content: data.result ?? JSON.stringify(data, null, 2) });
+    }
+  } catch(e) {
+    histories[selected] = histories[selected].filter(m => m.role !== 'typing');
+    histories[selected].push({ role: 'error', content: e.name === 'TimeoutError' ? 'Timeout' : `Error: ${e.message}` });
+  }
+  isLoading = false;
+  document.getElementById('msg-input').disabled = false;
+  document.getElementById('send-btn').disabled = false;
+  document.getElementById('msg-input').focus();
+  renderMessages();
+}
+async function runPlaybook(name) {
+  closePlaybookModal();
+  const runner = Object.values(agents).find(a => a.card?.name === 'playbook_runner');
+  if (!runner) { alert('No se encontró el agente playbook_runner'); return; }
+  const inputEl = document.getElementById('msg-input');
+  const initialValue = inputEl.value.trim();
+  const userMsg = await pbOpenInputModal(name, initialValue);
+  if (!userMsg) return;
+  inputEl.value = '';
+  inputEl.style.height = 'auto';
+  await _executePlaybook(runner, userMsg, { playbook_name: name }, name);
+}
+
+async function _executePlaybook(runner, userMsg, extra, label) {
+  isLoading = true;
+  document.getElementById('msg-input').disabled = true;
+  document.getElementById('send-btn').disabled = true;
+  histories[selected].push({ role: 'user', content: `▶ Playbook: ${label}\n${userMsg}` });
+  histories[selected].push({ role: 'typing' });
+  renderMessages();
+  try {
+    const r = await fetch(`${runner.url}/tasks/send`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages: userMsg, ...extra }),
+      signal: AbortSignal.timeout(3000000)
+    });
+    histories[selected] = histories[selected].filter(m => m.role !== 'typing');
+    if (!r.ok) {
+      const err = await r.text();
+      histories[selected].push({ role: 'error', content: `HTTP ${r.status}: ${err}` });
+    } else {
+      const data = await r.json();
+      histories[selected].push({ role: 'playbook', playbook: data.playbook || label, trace: data.trace || [], result: data.result });
+    }
+  } catch(e) {
+    histories[selected] = histories[selected].filter(m => m.role !== 'typing');
+    histories[selected].push({ role: 'error', content: e.name === 'TimeoutError' ? 'Timeout' : `Error: ${e.message}` });
+  }
+  isLoading = false;
+  document.getElementById('msg-input').disabled = false;
+  document.getElementById('send-btn').disabled = false;
+  document.getElementById('msg-input').focus();
+  renderMessages();
+}
+
+// ── N8N-LIKE BUILDER STATE ─────────────────────────────────
+let pbSteps=[];let pbSelectedIdx=null;let pbDragIdx=null;let pbDragOffset={x:0,y:0};let pbCanvasDropAgent='';let pbNodeSeq=1;let pbZoom=1;const PB_ZOOM_MIN=.35,PB_ZOOM_MAX=1.8;
+function pbApplyZoom(){const p=document.getElementById('pb-flow-plane'),l=document.getElementById('pb-zoom-label');if(p){p.style.transform=`scale(${pbZoom})`;p.style.width=`${1500*pbZoom}px`;p.style.height=`${1000*pbZoom}px`;}if(l)l.textContent=`${Math.round(pbZoom*100)}%`;pbRenderLinks();}
+function pbSetZoom(v,e=null){const c=document.getElementById('pb-flow-canvas'),old=pbZoom;pbZoom=Math.max(PB_ZOOM_MIN,Math.min(PB_ZOOM_MAX,v));if(c&&e){const r=c.getBoundingClientRect(),mx=e.clientX-r.left,my=e.clientY-r.top,wx=(c.scrollLeft+mx)/old,wy=(c.scrollTop+my)/old;pbApplyZoom();c.scrollLeft=wx*pbZoom-mx;c.scrollTop=wy*pbZoom-my;}else pbApplyZoom();}
+function pbZoomIn(){pbSetZoom(pbZoom+.1)}function pbZoomOut(){pbSetZoom(pbZoom-.1)}function pbZoomReset(){pbSetZoom(1)}function pbZoomFit(){const c=document.getElementById('pb-flow-canvas');if(!c||!pbSteps.length){pbZoomReset();return;}const minX=Math.min(...pbSteps.map(s=>s.x||0)),minY=Math.min(...pbSteps.map(s=>s.y||0)),maxX=Math.max(...pbSteps.map(s=>(s.x||0)+245)),maxY=Math.max(...pbSteps.map(s=>(s.y||0)+130)),pad=90;pbSetZoom(Math.min(1.25,Math.max(PB_ZOOM_MIN,Math.min(c.clientWidth/Math.max(300,maxX-minX+pad*2),c.clientHeight/Math.max(220,maxY-minY+pad*2)))));c.scrollLeft=Math.max(0,(minX-pad)*pbZoom);c.scrollTop=Math.max(0,(minY-pad)*pbZoom);}function pbCanvasWheel(e){if(!e.ctrlKey&&!e.metaKey)return;e.preventDefault();pbSetZoom(pbZoom+(e.deltaY<0?.08:-.08),e);}
+let pbFlowWheelBound=false;function pbBindFlowWheel(){if(pbFlowWheelBound)return;const c=document.getElementById('pb-flow-canvas');if(!c)return;c.addEventListener('wheel',pbCanvasWheel,{passive:false});pbFlowWheelBound=true;}
+function pbEscAttr(s){return escapeHtml(s).replace(/"/g,'&quot;')}function pbAgentNames(){return Object.keys(agents).filter(n=>agents[n].ok)}function pbAgentOpts(sel=''){const ns=pbAgentNames();if(!ns.length)return'<option value="">— sin agentes —</option>';return ns.map(n=>`<option value="${pbEscAttr(n)}" ${n===sel?'selected':''}>${escapeHtml(n)} :${agents[n].port}</option>`).join('')}function pbNextId(p='paso'){const u=new Set(pbSteps.map(s=>s.id));let id;do{id=p+(pbNodeSeq++)}while(u.has(id));return id}function pbNewStep(a='',x=null,y=null){const i=pbSteps.length;return{id:pbNextId('paso'),type:'simple',agent:a||pbAgentNames()[0]||'',message:i===0?'{input}':`{${pbSteps[i-1]?.id||'input'}.output}`,parallel:[],x:x??300,y:y??(80+i*170)}}function pbNewParallelStep(x=null,y=null){const n=pbAgentNames(),i=pbSteps.length;return{id:pbNextId('parallel'),type:'parallel',x:x??300,y:y??(80+i*180),parallel:[{agent:n[0]||'',message:i===0?'{input}':`{${pbSteps[i-1]?.id||'input'}.output}`},{agent:n[1]||n[0]||'',message:i===0?'{input}':`{${pbSteps[i-1]?.id||'input'}.output}`}]}}
+function pbRenderPalette(){const b=document.getElementById('pb-agent-palette');if(!b)return;const q=(document.getElementById('pb-agent-search')?.value||'').toLowerCase().trim(),ns=pbAgentNames().filter(n=>!q||n.toLowerCase().includes(q));if(!ns.length){b.innerHTML='<div class="pb-palette-empty">No hay agentes activos. Pulsa <strong>Descubrir</strong> o añade uno manualmente.</div>';return}b.innerHTML=ns.map(n=>`<div class="pb-agent-chip" draggable="true" ondragstart="pbPaletteDrag(event,'${escapeJsString(n)}')" onclick="pbAddAgentNode('${escapeJsString(n)}')"><span class="agent-dot"></span><span>${escapeHtml(n)}</span><span class="agent-meta">:${agents[n].port}</span></div>`).join('')+`<div class="pb-agent-chip" onclick="pbAddParallelStep()"><i class="ti ti-git-branch"></i><span>Grupo paralelo</span><span class="agent-meta">fan-out</span></div>`}function pbPaletteDrag(e,a){pbCanvasDropAgent=a;e.dataTransfer.setData('text/plain',a);e.dataTransfer.effectAllowed='copy'}function pbCanvasDragOver(e){e.preventDefault();e.dataTransfer.dropEffect='copy'}function pbCanvasDrop(e){e.preventDefault();const c=document.getElementById('pb-flow-canvas'),r=c.getBoundingClientRect(),a=e.dataTransfer.getData('text/plain')||pbCanvasDropAgent,x=Math.max(40,(c.scrollLeft+e.clientX-r.left)/pbZoom-120),y=Math.max(40,(c.scrollTop+e.clientY-r.top)/pbZoom-50);if(a)pbAddAgentNode(a,x,y)}
+function pbRender(){pbRenderPalette();const c=document.getElementById('pb-canvas');if(!c)return;if(!pbSteps.length){c.innerHTML=`<div class="pb-canvas-empty"><i class="ti ti-route"></i><div style="font-weight:600;color:var(--text2);margin-bottom:4px">Crea tu flujo</div><div>Arrastra un agente desde la izquierda o pulsa “+” para añadir el primer nodo. Usa Ctrl/⌘ + rueda para zoom.</div></div>`;pbApplyZoom();pbRenderInspector();pbYamlPreview();return}c.innerHTML=pbSteps.map((s,i)=>pbNodeHtml(s,i)).join('');pbApplyZoom();pbRenderInspector();pbYamlPreview()}
+function pbNodeHtml(s,i){const sel=i===pbSelectedIdx?'selected':'',par=s.type==='parallel',title=par?'Paralelo':(s.agent||'Agente'),icon=par?'ti-git-branch':'ti-robot',body=par?(s.parallel||[]).map(r=>`<div class="pb-parallel-pill"><i class="ti ti-robot"></i><span>${escapeHtml(r.agent||'Sin agente')}</span></div>`).join(''):`<div class="pb-node-message">${escapeHtml(s.message||'')}</div>`;return`<div class="pb-node ${par?'parallel':''} ${sel}" style="left:${s.x||0}px;top:${s.y||0}px" onmousedown="pbNodeMouseDown(event,${i})" onclick="pbSelectNode(${i},event)"><span class="pb-port in"></span><span class="pb-port out"></span><div class="pb-node-head"><div class="pb-node-icon"><i class="ti ${icon}"></i></div><div style="min-width:0;flex:1"><div class="pb-node-title">${escapeHtml(title)}</div><div class="pb-node-kind">${escapeHtml(s.id)}</div></div><button class="pb-mini-btn" onclick="pbDuplicateStep(${i},event)"><i class="ti ti-copy"></i></button></div><div class="pb-node-body">${par?`${(s.parallel||[]).length} agentes en paralelo`:'Paso secuencial'}${body}</div><div class="pb-node-foot"><span>${i+1}/${pbSteps.length}</span><span>${par?'parallel':'task'}</span></div></div>`}
+function pbRenderLinks(){const svg=document.getElementById('pb-flow-svg');if(!svg)return;if(pbSteps.length<2){svg.innerHTML='';return}let out='';for(let i=0;i<pbSteps.length-1;i++){const a=pbSteps[i],b=pbSteps[i+1],x1=(a.x||0)+245,y1=(a.y||0)+56,x2=b.x||0,y2=(b.y||0)+56,m=Math.max(40,Math.abs(x2-x1)/2),d=`M ${x1} ${y1} C ${x1+m} ${y1}, ${x2-m} ${y2}, ${x2} ${y2}`;out+=`<path class="pb-flow-link-shadow" d="${d}"></path><path class="pb-flow-link" d="${d}"></path>`}svg.innerHTML=out}
+function pbRenderInspector(){const b=document.getElementById('pb-inspector'),sub=document.getElementById('pb-inspector-sub');if(!b)return;if(pbSelectedIdx===null||!pbSteps[pbSelectedIdx]){if(sub)sub.textContent='Selecciona un nodo';b.innerHTML='<div class="pb-inspector-empty">Selecciona un nodo para editarlo.</div>';return}const s=pbSteps[pbSelectedIdx],i=pbSelectedIdx;if(sub)sub.textContent=`${s.id} · ${s.type==='parallel'?'paralelo':'simple'}`;const refs=pbRefsHtml(i);if(s.type==='parallel')b.innerHTML=`<div class="pb-field"><label>ID</label><input value="${pbEscAttr(s.id)}" oninput="pbUpdId(${i},this.value)"></div><div class="pb-ref-box">${refs}</div><div class="pb-par-editor">${(s.parallel||[]).map((r,ri)=>pbParallelEditorRow(i,ri,r)).join('')}</div><button class="btn" onclick="pbAddPar(${i})"><i class="ti ti-plus"></i> Añadir rama</button><div class="pb-inspector-actions"><button class="btn" onclick="pbDuplicateStep(${i})">Duplicar</button><button class="btn danger" onclick="pbDelStep(${i})">Eliminar</button></div>`;else b.innerHTML=`<div class="pb-field"><label>ID</label><input value="${pbEscAttr(s.id)}" oninput="pbUpdId(${i},this.value)"></div><div class="pb-field"><label>Agente</label><select onchange="pbUpd(${i},'agent',this.value)">${pbAgentOpts(s.agent)}</select></div><div class="pb-field"><label>Mensaje</label><textarea oninput="pbUpd(${i},'message',this.value)">${escapeHtml(s.message||'')}</textarea></div><div class="pb-ref-box">${refs}</div><div class="pb-inspector-actions"><button class="btn" onclick="pbDuplicateStep(${i})">Duplicar</button><button class="btn danger" onclick="pbDelStep(${i})">Eliminar</button></div>`}function pbParallelEditorRow(si,ri,r){return`<div class="pb-par-editor-row"><div class="pb-field"><label>Agente</label><select onchange="pbUpdPar(${si},${ri},'agent',this.value)">${pbAgentOpts(r.agent)}</select></div><div class="pb-field"><label>Mensaje</label><textarea oninput="pbUpdPar(${si},${ri},'message',this.value)">${escapeHtml(r.message||'')}</textarea></div><button class="btn" onclick="pbDelPar(${si},${ri})">Quitar rama</button></div>`}function pbRefsHtml(i){const prev=pbSteps.slice(0,i).map(s=>s.id);return['<code>{input}</code>'].concat(prev.map(id=>`<code>{${escapeHtml(id)}.output}</code>`)).join(' ')}
+function pbSelectNode(i,e){if(e)e.stopPropagation();pbSelectedIdx=i;pbRender()}function pbAddStep(){pbSteps.push(pbNewStep());pbSelectedIdx=pbSteps.length-1;pbAutoLayout(false);pbRender()}function pbAddAgentNode(a,x=null,y=null){pbSteps.push(pbNewStep(a,x,y));pbSelectedIdx=pbSteps.length-1;if(x===null)pbAutoLayout(false);pbRender()}function pbAddParallelStep(x=null,y=null){pbSteps.push(pbNewParallelStep(x,y));pbSelectedIdx=pbSteps.length-1;if(x===null)pbAutoLayout(false);pbRender()}function pbDelStep(i){pbSteps.splice(i,1);pbSelectedIdx=null;pbRender()}function pbDuplicateStep(i,e){if(e)e.stopPropagation();const c=JSON.parse(JSON.stringify(pbSteps[i]));c.id=pbNextId(c.type==='parallel'?'parallel':'paso');c.x=(c.x||0)+32;c.y=(c.y||0)+32;pbSteps.splice(i+1,0,c);pbSelectedIdx=i+1;pbRender()}function pbUpd(i,f,v){pbSteps[i][f]=v;pbRender()}function pbUpdId(i,v){pbSteps[i].id=(v||'').trim()||pbSteps[i].id;pbRender()}function pbAddPar(i){pbSteps[i].parallel.push({agent:pbAgentNames()[0]||'',message:'{input}'});pbRender()}function pbDelPar(si,ri){pbSteps[si].parallel.splice(ri,1);pbRender()}function pbUpdPar(si,ri,f,v){pbSteps[si].parallel[ri][f]=v;pbRender()}function pbClearBuilder(){pbSteps=[];pbSelectedIdx=null;pbNodeSeq=1;pbRender()}function pbAutoLayout(r=true){pbSteps.forEach((s,i)=>{s.x=300+(i%3)*315;s.y=90+Math.floor(i/3)*210});if(r)pbRender()}
+function pbNodeMouseDown(e,i){if(e.target.closest('button,input,select,textarea'))return;pbSelectedIdx=i;pbDragIdx=i;const s=pbSteps[i],c=document.getElementById('pb-flow-canvas'),r=c.getBoundingClientRect();pbDragOffset.x=(c.scrollLeft+e.clientX-r.left)/pbZoom-(s.x||0);pbDragOffset.y=(c.scrollTop+e.clientY-r.top)/pbZoom-(s.y||0);document.addEventListener('mousemove',pbNodeMouseMove);document.addEventListener('mouseup',pbNodeMouseUp);e.preventDefault()}function pbNodeMouseMove(e){if(pbDragIdx===null)return;const c=document.getElementById('pb-flow-canvas'),r=c.getBoundingClientRect(),s=pbSteps[pbDragIdx];s.x=Math.max(20,(c.scrollLeft+e.clientX-r.left)/pbZoom-pbDragOffset.x);s.y=Math.max(20,(c.scrollTop+e.clientY-r.top)/pbZoom-pbDragOffset.y);const n=document.querySelectorAll('.pb-node')[pbDragIdx];if(n){n.style.left=s.x+'px';n.style.top=s.y+'px';n.classList.add('dragging')}pbRenderLinks()}function pbNodeMouseUp(){document.removeEventListener('mousemove',pbNodeMouseMove);document.removeEventListener('mouseup',pbNodeMouseUp);pbDragIdx=null;pbRender()}
+function pbBuild(){const name=(document.getElementById('pb-name')?.value||'').trim()||'Mi playbook',desc=(document.getElementById('pb-desc')?.value||'').trim(),steps=pbSteps.map(s=>s.type==='parallel'?{id:s.id,parallel:(s.parallel||[]).map(r=>({agent:r.agent,message:r.message}))}:{id:s.id,agent:s.agent,message:s.message}),pb={name,steps};if(desc)pb.description=desc;return pb}function pbYamlScalar(v){if(v===null||v===undefined)return'';if(typeof v==='number'||typeof v==='boolean')return String(v);const s=String(v);if(s===''||/[:#\[\]\{\},&*?!|>'"%@`\n\r]/.test(s)||/^\s|\s$/.test(s))return'"'+s.replace(/\\/g,'\\\\').replace(/"/g,'\\"').replace(/\r/g,'\\r').replace(/\n/g,'\\n')+'"';return s}function pbYamlKeyValue(k,v,i){const p='  '.repeat(i);if(Array.isArray(v))return`${p}${k}:\n${pbYamlArray(v,i+1)}`;if(v&&typeof v==='object')return`${p}${k}:\n${pbToYaml(v,i+1)}`;return`${p}${k}: ${pbYamlScalar(v)}\n`}function pbYamlArray(a,i){const p='  '.repeat(i);let o='';for(const it of a){if(it&&typeof it==='object'&&!Array.isArray(it)){const es=Object.entries(it),[fk,fv]=es[0];o+=`${p}- ${fk}: ${Array.isArray(fv)||typeof fv==='object'?'\n'+(Array.isArray(fv)?pbYamlArray(fv,i+2):pbToYaml(fv,i+2)):pbYamlScalar(fv)+'\n'}`;for(const[k,v]of es.slice(1))o+=pbYamlKeyValue(k,v,i+1)}else o+=`${p}- ${pbYamlScalar(it)}\n`}return o}function pbToYaml(o,i=0){let out='';for(const[k,v]of Object.entries(o))out+=pbYamlKeyValue(k,v,i);return out}function pbYamlPreview(){const p=document.getElementById('pb-yaml-preview');if(!p)return;try{p.textContent=pbToYaml(pbBuild())}catch(e){p.textContent='Error: '+e.message}}
+// ── SAVE / RUN ───────────────────────────────────────────────
+async function pbSave() {
+  const runner = Object.values(agents).find(a=>a.card?.name==='playbook_runner');
+  if (!runner){alert('No se encontró playbook_runner');return;}
+  const pb = pbBuild();
+  if (!pb.name||!pb.steps.length){alert('Pon un nombre y al menos un paso');return;}
+  const persist = document.getElementById('pb-persist')?.checked||false;
+  try {
+    const r = await fetch(`${runner.url}/playbooks/save`,{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({yaml:pbToYaml(pb),persist})
+    });
+    const data=await r.json();
+    if(data.ok){alert(`✓ Playbook "${data.name}" guardado`);await loadPlaybooks();switchPbTab('run');}
+    else alert('Error: '+data.error);
+  }catch(e){alert('Error: '+e.message);}
+}
+async function pbRunNow() {
+  const runner = Object.values(agents).find(a=>a.card?.name==='playbook_runner');
+  if(!runner){alert('No se encontró playbook_runner');return;}
+  const pb = pbBuild();
+  if(!pb.name||!pb.steps.length){alert('Pon un nombre y al menos un paso');return;}
+  const yamlStr = pbToYaml(pb);
+  const chatInput = document.getElementById('msg-input');
+  const initialValue = chatInput.value.trim();
+  closePlaybookModal();
+  const userMsg = await pbOpenInputModal(pb.name, initialValue);
+  if(!userMsg)return;
+  chatInput.value='';chatInput.style.height='auto';
+  await _executePlaybook(runner,userMsg,{playbook_yaml:yamlStr},pb.name);
+}
+
+// Kept for backward compat (savePbYaml/runPbYaml may be called from old code)
+async function savePbYaml() { await pbSave(); }
+async function runPbYaml() { await pbRunNow(); }
+
+// --- MAIN TABS / AGENT CREATOR ---
+let acCurrentPreview = null;
+function switchMainTab(tab) {
+  const explorer = document.getElementById('explorer-view');
+  const creator = document.getElementById('agent-creator-view');
+  const explorerBtn = document.getElementById('tab-explorer');
+  const creatorBtn = document.getElementById('tab-creator');
+  if (explorer) explorer.style.display = tab === 'explorer' ? 'flex' : 'none';
+  if (creator) creator.classList.toggle('active', tab === 'creator');
+  if (explorerBtn) explorerBtn.classList.toggle('active', tab === 'explorer');
+  if (creatorBtn) creatorBtn.classList.toggle('active', tab === 'creator');
+  if (tab === 'creator') acSyncEnvHint();
+}
+function acBase() { return document.getElementById('ac-creator-url').value.trim().replace(/\/$/, ''); }
+function acSnake(value) { return String(value || '').trim().toLowerCase().replace(/[^a-z0-9_\-\s]/g, '').replace(/[\-\s]+/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, ''); }
+function acSyncEnvHint() { const name = acSnake(document.getElementById('ac-agent-name').value); document.getElementById('ac-env-hint').value = name ? `AGENT_${name.toUpperCase()}_PORT` : ''; }
+function acToggleTools() { const enabled = document.getElementById('ac-use-tools').checked; document.getElementById('ac-tool-profile-wrap').style.display = enabled ? 'flex' : 'none'; if (enabled) acLoadToolProfiles(); }
+function acSetStatus(text) { document.getElementById('ac-status').textContent = text; }
+function acToast(message, ok = true) { const toast = document.getElementById('ac-toast'); toast.textContent = message; toast.className = 'ac-toast open ' + (ok ? '' : 'err'); setTimeout(() => toast.classList.remove('open'), ok ? 7000 : 12000); }
+function acPayload() {
+  const portValue = document.getElementById('ac-port')?.value;
+  return {
+    agent_name: document.getElementById('ac-agent-name').value,
+    description: document.getElementById('ac-description').value,
+    prompt: document.getElementById('ac-prompt').value,
+    port: portValue ? Number(portValue) : null,
+    use_tools: document.getElementById('ac-use-tools').checked,
+    tool_profile: document.getElementById('ac-tool-profile').value || null,
+    capabilities: document.getElementById('ac-capabilities').value.split(',').map(x => x.trim()).filter(Boolean),
+    overwrite: document.getElementById('ac-overwrite').checked
+  };
+}
+async function acLoadToolProfiles() {
+  const select = document.getElementById('ac-tool-profile'); const current = select.value; select.innerHTML = '<option value="">Cargando perfiles...</option>';
+  try { const response = await fetch(`${acBase()}/tool-profiles`, { signal: AbortSignal.timeout(15000) }); const data = await response.json(); if (!response.ok) throw new Error(JSON.stringify(data)); const profiles = data.profiles || []; if (!profiles.length) { select.innerHTML = '<option value="">No hay perfiles en agent_config.yaml</option>'; return; }
+    select.innerHTML = '<option value="">Selecciona perfil...</option>' + profiles.map(profile => { const servers = (profile.servers || []).map(server => server.name).filter(Boolean).join(', '); const label = servers ? `${profile.name} — ${servers}` : profile.name; return `<option value="${escapeHtml(profile.name)}">${escapeHtml(label)}</option>`; }).join('');
+    if (current && [...select.options].some(option => option.value === current)) select.value = current;
+  } catch (error) { select.innerHTML = '<option value="">Error cargando perfiles</option>'; acToast('No se pudieron cargar perfiles: ' + error.message, false); }
+}
+async function acPost(path, body) { const response = await fetch(`${acBase()}${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: AbortSignal.timeout(60000) }); const text = await response.text(); let data; try { data = JSON.parse(text); } catch { data = text; } if (!response.ok) throw new Error(typeof data === 'string' ? data : JSON.stringify(data, null, 2)); return data; }
+function acRenderPreview(data) {
+  acCurrentPreview = data;
+  const files = Object.entries(data.files || {});
+  if (data.planned_updates) files.push(['planned_updates.json', JSON.stringify(data.planned_updates, null, 2)]);
+  document.getElementById('ac-tabs').innerHTML = files.map(([path], idx) => `<button class="ac-tab ${idx === 0 ? 'active' : ''}" onclick="acShowFile(${idx})">${escapeHtml(path.split('/').slice(-2).join('/'))}</button>`).join('');
+  acShowFile(0);
+}
+function acShowFile(index) { const files = Object.entries(acCurrentPreview?.files || {}); if (acCurrentPreview?.planned_updates) files.push(['planned_updates.json', JSON.stringify(acCurrentPreview.planned_updates, null, 2)]); if (!files[index]) return; document.querySelectorAll('.ac-tab').forEach((tab, idx) => tab.classList.toggle('active', idx === index)); document.getElementById('ac-preview').textContent = `# ${files[index][0]}\n\n${files[index][1]}`; }
+async function acPreviewAgent() { try { acSetStatus('Generando preview...'); const data = await acPost('/preview', acPayload()); acRenderPreview(data); acSetStatus('Preview generado'); } catch (error) { acSetStatus('Error'); acToast(error.message, false); } }
+async function acCreateAgent() { try { acSetStatus('Creando agente...'); const data = await acPost('/create', acPayload()); acSetStatus('Agente creado'); acToast(`Agente creado: ${data.agent_name}\n\n${(data.next_steps || []).join('\n')}`); await acPreviewAgent(); } catch (error) { acSetStatus('Error'); acToast(error.message, false); } }
+</script>
+</body>
+</html>

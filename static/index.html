@@ -288,6 +288,27 @@
 </div>
 
 
+<div class="modal-overlay" id="pb-input-modal">
+  <div class="modal pb-input-dialog">
+    <div class="pb-input-head">
+      <div class="pb-input-icon"><i class="ti ti-player-play"></i></div>
+      <div>
+        <div class="pb-input-title" id="pb-input-title">Ejecutar playbook</div>
+        <div class="pb-input-subtitle" id="pb-input-subtitle">Introduce el dato de entrada que usará el playbook.</div>
+      </div>
+    </div>
+    <div class="pb-input-body">
+      <label for="pb-input-text"><span>Input del playbook</span><span>Ctrl/⌘ + Enter para ejecutar</span></label>
+      <textarea id="pb-input-text" class="pb-input-textarea" placeholder="Escribe aquí el input para el playbook..." onkeydown="pbInputKeydown(event)"></textarea>
+      <div class="pb-input-error" id="pb-input-error"></div>
+    </div>
+    <div class="pb-input-actions">
+      <button class="btn" onclick="pbInputCancel()">Cancelar</button>
+      <button class="btn primary" onclick="pbInputAccept()"><i class="ti ti-player-play"></i> Ejecutar</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="pb-delete-modal">
   <div class="modal pb-delete-dialog">
     <div class="pb-delete-head">

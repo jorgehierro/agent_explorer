@@ -315,11 +315,13 @@ function updateAutomationButtonForSelectedAgent() {
     label.textContent = 'Workflows';
     icon.className = 'ti ti-route';
     btn.title = 'Workflows';
-  } else {
+  } else if (kind === 'playbook') {
     btn.style.display = (isAdmin || perms.tabs.includes('playbooks')) ? 'inline-flex' : 'none';
     label.textContent = 'Playbooks';
     icon.className = 'ti ti-list-check';
     btn.title = 'Playbooks';
+  } else {
+    btn.style.display = 'none';
   }
 }
 
@@ -422,14 +424,7 @@ async function sendMessage() {
   const msg = input.value.trim();
   if (!msg) return;
 
-  // Interceptar la ejecución de playbooks/workflows desde la barra de chat
-  const match = msg.match(/^\[Lanzar:\s*(.+?)\]\s*(.*)$/si);
-  if (match) {
-    const name = match[1].trim();
-    const payloadInput = match[2].trim();
-    executePlaybook(name, payloadInput);
-    return;
-  }
+
 
   isLoading = true;
   input.value = '';
@@ -497,7 +492,7 @@ document.addEventListener('keydown', e => {
     closeModal(); 
     closePasswordModal();
     if(typeof closeUserModal === 'function') closeUserModal();
-    pbCloseInputModal();
+    pbInputCancel();
     pbCloseDeleteModal();
     if(document.getElementById('playbook-modal')) document.getElementById('playbook-modal').classList.remove('open'); 
   }
@@ -1048,17 +1043,17 @@ async function pbRefreshList() {
         const meta = Array.isArray(data) ? {} : (data[k] || {});
         const jsKey = escapeJsString(k);
         const displayName = escapeHtml(meta.name || k);
-        const descText = meta.description || (isWorkflow && meta.module ? ('Módulo: ' + meta.module) : 'Sin descripción');
+        const descText = meta.description || (isWorkflow && meta.module ? ('Módulo: ' + meta.module) : '');
+        const desc = descText ? `<div class="pb-desc">${escapeHtml(descText)}</div>` : '';
         const stepsText = isWorkflow ? 'workflow' : `${Number(meta.steps || 0)} pasos`;
+        const onclick = isWorkflow ? `runWorkflow('${jsKey}')` : `runPlaybook('${jsKey}')`;
         
         return `
         <div class="playbook-item">
-          <div class="pb-run-area" onclick="pbPrepareRun('${jsKey}')" title="Ejecutar">
-            <div class="pb-run-main">
-              <div class="pb-name"><i class="ti ti-player-play-filled" style="color:var(--blue-text);font-size:10px;margin-right:4px"></i> ${displayName}</div>
-              <div class="pb-desc">${escapeHtml(descText)}</div>
-            </div>
-            <div class="pb-steps">${stepsText}</div>
+          <div class="pb-run-area" onclick="${onclick}" title="Ejecutar">
+            <div class="pb-run-main"><div class="pb-name">${displayName}</div>${desc}</div>
+            <span class="pb-steps">${stepsText}</span>
+            <i class="ti ti-player-play" style="font-size:13px;color:var(--text3)"></i>
           </div>
           ${!isWorkflow ? `<button class="pb-del-btn" onclick="pbAskDelete('${jsKey}')" title="Eliminar"><i class="ti ti-trash"></i></button>` : ''}
         </div>
@@ -1070,54 +1065,127 @@ async function pbRefreshList() {
   } catch(e) { list.innerHTML = `<div style="color:var(--red);text-align:center;padding:20px">Error de conexión</div>`; }
 }
 
-let pbTargetRun = '';
-function pbPrepareRun(name) {
-  document.getElementById('playbook-modal').classList.remove('open');
-  const input = document.getElementById('msg-input');
-  input.value = `[Lanzar: ${name}]\n`;
-  input.focus();
+// --- PLAYBOOK INPUT MODAL (Promise-based, matches original) ---
+let pbInputResolver = null;
+function pbOpenInputModal(playbookLabel, initialValue) {
+  return new Promise(resolve => {
+    pbInputResolver = resolve;
+    const modal = document.getElementById('pb-input-modal');
+    const title = document.getElementById('pb-input-title');
+    const subtitle = document.getElementById('pb-input-subtitle');
+    const text = document.getElementById('pb-input-text');
+    const error = document.getElementById('pb-input-error');
+    title.textContent = `Ejecutar: ${playbookLabel}`;
+    subtitle.textContent = 'Introduce el dato de entrada que recibirá el playbook. Puedes revisar o editar el texto antes de ejecutarlo.';
+    text.value = initialValue || '';
+    error.textContent = '';
+    modal.classList.add('open');
+    setTimeout(() => { text.focus(); if (text.value) text.select(); }, 60);
+  });
+}
+function pbResolveInputModal(value) {
+  document.getElementById('pb-input-modal').classList.remove('open');
+  const resolve = pbInputResolver;
+  pbInputResolver = null;
+  if (resolve) resolve(value);
+}
+function pbInputCancel() { if (pbInputResolver) pbResolveInputModal(null); }
+function pbInputAccept() {
+  const text = document.getElementById('pb-input-text');
+  const error = document.getElementById('pb-input-error');
+  const value = text.value.trim();
+  if (!value) { error.textContent = 'Introduce un input para ejecutar el playbook.'; text.focus(); return; }
+  pbResolveInputModal(value);
+}
+function pbInputKeydown(e) {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); pbInputAccept(); }
 }
 
-async function executePlaybook(name, payloadInput) {
+async function runWorkflow(name) {
+  document.getElementById('playbook-modal').classList.remove('open');
+  const runner = agents[selected];
+  if (!runner || runner.card?.name !== 'workflow_runner') { alert('Selecciona el agente workflow_runner'); return; }
   const inputEl = document.getElementById('msg-input');
-  const btn = document.getElementById('send-btn');
+  const initialValue = inputEl.value.trim();
+  const userMsg = await pbOpenInputModal(name, initialValue);
+  if (!userMsg) return;
+  inputEl.value = ''; inputEl.style.height = 'auto';
+  await _executeWorkflow(runner, userMsg, name);
+}
+
+async function _executeWorkflow(runner, userMsg, workflowName) {
   isLoading = true;
-  inputEl.value = '';
-  inputEl.style.height = 'auto';
-  inputEl.disabled = true;
-  btn.disabled = true;
-  
-  histories[selected].push({ role: 'user', content: `[Lanzado: ${name}]\n${payloadInput}` });
+  document.getElementById('msg-input').disabled = true;
+  document.getElementById('send-btn').disabled = true;
+  histories[selected].push({ role: 'user', content: `⚙ Workflow: ${workflowName}\n${userMsg}` });
   histories[selected].push({ role: 'typing' });
   renderMessages();
-
   try {
-    const a = agents[selected];
-    const endp = selectedAgentKind() === 'workflow' ? `/workflows/${name}/run` : `/playbooks/${name}/run`;
-    const r = await fetch('/api/proxy/fetch', {
-      method: 'POST', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ url: a.url + endp, method: 'POST', body: { initial: payloadInput } })
+    const r = await fetch('/api/proxy/send', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: runner.url, messages: userMsg, workflow_name: workflowName }),
+      signal: AbortSignal.timeout(3000000)
     });
-    
     histories[selected] = histories[selected].filter(m => m.role !== 'typing');
-    
-    if(r.ok) {
-      const res = await r.json();
-      histories[selected].push({ role: 'playbook', playbook: name, trace: res.trace });
-      showToast('Ejecución completada');
-    } else { 
-      const err = await r.json(); 
-      histories[selected].push({ role: 'error', content: err.error || 'Error en ejecución' }); 
+    if (!r.ok) {
+      const err = await r.text();
+      histories[selected].push({ role: 'error', content: `HTTP ${r.status}: ${err}` });
+    } else {
+      const data = await r.json();
+      histories[selected].push({ role: 'agent', content: data.result ?? JSON.stringify(data, null, 2) });
     }
-  } catch(e) { 
+  } catch(e) {
     histories[selected] = histories[selected].filter(m => m.role !== 'typing');
-    histories[selected].push({ role: 'error', content: 'Error de red al ejecutar playbook' }); 
+    histories[selected].push({ role: 'error', content: e.name === 'TimeoutError' ? 'Timeout' : `Error: ${e.message}` });
   }
-  
   isLoading = false;
-  inputEl.disabled = false;
-  btn.disabled = false;
-  inputEl.focus();
+  document.getElementById('msg-input').disabled = false;
+  document.getElementById('send-btn').disabled = false;
+  document.getElementById('msg-input').focus();
+  renderMessages();
+}
+
+async function runPlaybook(name) {
+  document.getElementById('playbook-modal').classList.remove('open');
+  const runner = Object.values(agents).find(a => a.card?.name === 'playbook_runner');
+  if (!runner) { alert('No se encontró el agente playbook_runner'); return; }
+  const inputEl = document.getElementById('msg-input');
+  const initialValue = inputEl.value.trim();
+  const userMsg = await pbOpenInputModal(name, initialValue);
+  if (!userMsg) return;
+  inputEl.value = ''; inputEl.style.height = 'auto';
+  await _executePlaybook(runner, userMsg, { playbook_name: name }, name);
+}
+
+async function _executePlaybook(runner, userMsg, extra, label) {
+  isLoading = true;
+  document.getElementById('msg-input').disabled = true;
+  document.getElementById('send-btn').disabled = true;
+  histories[selected].push({ role: 'user', content: `▶ Playbook: ${label}\n${userMsg}` });
+  histories[selected].push({ role: 'typing' });
+  renderMessages();
+  try {
+    const r = await fetch('/api/proxy/send', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: runner.url, messages: userMsg, ...extra }),
+      signal: AbortSignal.timeout(3000000)
+    });
+    histories[selected] = histories[selected].filter(m => m.role !== 'typing');
+    if (!r.ok) {
+      const err = await r.text();
+      histories[selected].push({ role: 'error', content: `HTTP ${r.status}: ${err}` });
+    } else {
+      const data = await r.json();
+      histories[selected].push({ role: 'playbook', playbook: data.playbook || label, trace: data.trace || [], result: data.result });
+    }
+  } catch(e) {
+    histories[selected] = histories[selected].filter(m => m.role !== 'typing');
+    histories[selected].push({ role: 'error', content: e.name === 'TimeoutError' ? 'Timeout' : `Error: ${e.message}` });
+  }
+  isLoading = false;
+  document.getElementById('msg-input').disabled = false;
+  document.getElementById('send-btn').disabled = false;
+  document.getElementById('msg-input').focus();
   renderMessages();
 }
 
@@ -1230,6 +1298,20 @@ async function acCreateAgent() {
     acToast(error.message, false); 
   } 
 }
+
+// --- MODAL OVERLAY CLICK-TO-CLOSE ---
+document.getElementById('modal')?.addEventListener('click', e => {
+  if (e.target === document.getElementById('modal')) closeModal();
+});
+document.getElementById('playbook-modal')?.addEventListener('click', e => {
+  if (e.target === document.getElementById('playbook-modal')) document.getElementById('playbook-modal').classList.remove('open');
+});
+document.getElementById('pb-input-modal')?.addEventListener('click', e => {
+  if (e.target === document.getElementById('pb-input-modal')) pbInputCancel();
+});
+document.getElementById('pb-delete-modal')?.addEventListener('click', e => {
+  if (e.target === document.getElementById('pb-delete-modal')) pbCloseDeleteModal();
+});
 
 // Start app
 window.onload = () => { checkAuth(); };
