@@ -241,17 +241,27 @@ async function discoverAgents() {
   }
 
   agents = {};
+  const ports = Array.from({ length: to - from + 1 }, (_, i) => from + i).filter(port => port !== 9097);
+  
   try {
-    const r = await fetch('/api/proxy/discover', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({base_url: base, port_from: from, port_to: to})
+    const results = await Promise.all(ports.map(async port => {
+      const url = `${base}:${port}`;
+      try {
+        const r = await fetch(`${url}/.well-known/agent.json`, { signal: AbortSignal.timeout(3000) });
+        if (!r.ok) return { name: null, url, port, ok: false };
+        const card = await r.json();
+        return { name: card.name || `agente-${port}`, url, port, ok: true, card };
+      } catch {
+        return { name: null, url, port, ok: false };
+      }
+    }));
+    
+    results.forEach(({ name, url, port, ok, card }) => {
+      if (ok && name) agents[name] = { url, port, ok, card };
     });
-    if(r.ok) {
-      const data = await r.json();
-      data.agents.forEach(a => { agents[a.name] = a; });
-    }
-  } catch(e) { console.error("Discovery error", e); }
+  } catch(e) { 
+    console.error("Discovery error", e); 
+  }
 
   btn.disabled = false;
   btn.innerHTML = '<i class="ti ti-radar"></i> Descubrir';
@@ -271,6 +281,13 @@ function renderSidebar() {
     const allowed = perms.agents.split(',').map(s => s.trim());
     names = names.filter(n => allowed.includes(n));
   }
+  
+  // Sort agents by port ascending (9001, 9002, etc)
+  names.sort((a, b) => {
+    const portA = parseInt(agents[a]?.port || 0);
+    const portB = parseInt(agents[b]?.port || 0);
+    return portA - portB;
+  });
   
   document.getElementById('agent-count').textContent = names.length ? `${names.length}` : '';
 
