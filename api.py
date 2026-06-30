@@ -78,7 +78,7 @@ def send_message():
         return jsonify({'error': 'Missing url'}), 400
         
     try:
-        timeout = current_app.config.get('PROXY_SEND_TIMEOUT', 240)
+        timeout = current_app.config.get('PROXY_SEND_TIMEOUT', 24000)
         r = requests.post(f"{url}/tasks/send", json=data, timeout=timeout)
         r.raise_for_status()
         log_audit(current_user, 'send_message', f'Sent message to {url}', request.remote_addr)
