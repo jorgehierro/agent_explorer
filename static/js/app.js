@@ -258,8 +258,8 @@ async function discoverAgents() {
   renderSidebar();
 
   const found = Object.keys(agents).length;
-  showToast(`Escaneados puertos: ${found} agente(s) encontrado(s)`, found > 0 ? 'success' : 'error');
-  if (selected) addSystemMsg(`Escaneados puertos — ${found} agente${found !== 1 ? 's' : ''} encontrado${found !== 1 ? 's' : ''}`);
+  showToast(`Escaneados puertos: ${found} asistente(s) encontrado(s)`, found > 0 ? 'success' : 'error');
+  if (selected) addSystemMsg(`Escaneados puertos — ${found} asistente${found !== 1 ? 's' : ''} encontrado${found !== 1 ? 's' : ''}`);
 }
 
 let currentSidebarTab = 'agents';
@@ -524,7 +524,7 @@ async function addManual() {
     if (ok) card = await r.json();
   } catch {}
   agents[name] = { url, port, ok, card };
-  showToast(`Agente ${name} añadido`);
+  showToast(`Asistente ${name} añadido`);
   closeModal();
   renderSidebar();
   selectAgent(name);
@@ -689,7 +689,7 @@ function populateAgentCheckboxes(agentsStr) {
   </label>`;
   
   if (allAgents.length === 0) {
-    html += `<div style="font-size:11px; color:var(--text3); margin-top:4px; grid-column:1/-1;">No hay agentes descubiertos.</div>`;
+    html += `<div style="font-size:11px; color:var(--text3); margin-top:4px; grid-column:1/-1;">No hay asistentes descubiertos.</div>`;
   } else {
     const allowed = agentsStr === '*' ? allAgents : agentsStr.split(',').map(s => s.trim());
     allAgents.forEach(a => {
@@ -840,7 +840,7 @@ window.addEventListener('mouseup', () => {
 function pbPopulatePalette(filter) {
   const p = document.getElementById('pb-agent-palette');
   const arr = Object.values(agents).filter(a => a.ok && a.name.toLowerCase().includes(filter.toLowerCase()));
-  if(!arr.length) { p.innerHTML = '<div style="color:var(--text3);font-size:12px;text-align:center;padding:10px">No hay agentes disponibles.</div>'; return; }
+  if(!arr.length) { p.innerHTML = '<div style="color:var(--text3);font-size:12px;text-align:center;padding:10px">No hay asistentes disponibles.</div>'; return; }
   p.innerHTML = arr.map(a => `<div class="pb-agent-chip" draggable="true" ondragstart="pbDragStart(event, '${a.name}')"><div class="agent-dot"></div><div>${a.name}</div><div class="agent-meta">:${a.port}</div></div>`).join('');
 }
 function pbFilterAgents(v) { pbPopulatePalette(v); }
@@ -877,8 +877,8 @@ function pbRenderCanvas() {
   container.innerHTML = pbSteps.map(s => {
     const isSel = s.id === pbSelectedId ? 'selected' : '';
     const isPar = s.type === 'parallel';
-    const warning = (!s.agent && !isPar) ? `<div class="pb-node-warning" title="Agente faltante"><i class="ti ti-alert-triangle"></i></div>` : '';
-    const desc = isPar ? `${Object.keys(s.parallel || {}).length} tareas en paralelo` : (s.agent || 'Sin agente asignado');
+    const warning = (!s.agent && !isPar) ? `<div class="pb-node-warning" title="Asistente faltante"><i class="ti ti-alert-triangle"></i></div>` : '';
+    const desc = isPar ? `${Object.keys(s.parallel || {}).length} tareas en paralelo` : (s.agent || 'Sin asistente asignado');
     const msgPrev = s.prompt ? `<div class="pb-node-message">${escapeHtml(s.prompt)}</div>` : '';
     return `<div class="pb-node ${isSel} ${isPar ? 'parallel' : ''}" id="node-${s.id}" style="left:${s.pos.x}px;top:${s.pos.y}px" onmousedown="pbNodeMouseDown(event, '${s.id}')">
       ${warning}
@@ -982,12 +982,12 @@ function pbInspector() {
   const agentsOpts = Object.keys(agents).filter(k=>agents[k].ok).map(k=>`<option value="${k}" ${step.agent===k?'selected':''}>${k}</option>`).join('');
   let html = `
     <div class="pb-field"><label>ID del Nodo</label><input type="text" value="${step.id}" onchange="pbUpdateStep('${step.id}', 'id', this.value)" /></div>
-    <div class="pb-field"><label>Tipo de ejecución</label><select onchange="pbUpdateStep('${step.id}', 'type', this.value)"><option value="sequential" ${step.type==='sequential'?'selected':''}>Sequential (Normal)</option><option value="parallel" ${step.type==='parallel'?'selected':''}>Parallel (Múltiples agentes)</option></select></div>
+    <div class="pb-field"><label>Tipo de ejecución</label><select onchange="pbUpdateStep('${step.id}', 'type', this.value)"><option value="sequential" ${step.type==='sequential'?'selected':''}>Sequential (Normal)</option><option value="parallel" ${step.type==='parallel'?'selected':''}>Parallel (Múltiples asistentes)</option></select></div>
   `;
   
   if (step.type === 'sequential') {
     html += `
-      <div class="pb-field"><label>Agente Destino</label><select onchange="pbUpdateStep('${step.id}', 'agent', this.value)"><option value="">-- Seleccionar --</option>${agentsOpts}</select></div>
+      <div class="pb-field"><label>Asistente Destino</label><select onchange="pbUpdateStep('${step.id}', 'agent', this.value)"><option value="">-- Seleccionar --</option>${agentsOpts}</select></div>
       <div class="pb-field"><label>Mensaje (Prompt)</label><textarea class="code-font" onchange="pbUpdateStep('${step.id}', 'prompt', this.value)" placeholder="Escribe el prompt... Usa \${inputs} para ref.">${step.prompt || ''}</textarea></div>
       <div class="pb-ref-box">Variables disponibles:<br/><code>\${inputs.initial}</code> - Entrada inicial<br/><code>\${steps.ID.output}</code> - Salida de un nodo</div>
     `;
@@ -995,10 +995,10 @@ function pbInspector() {
     html += `<div class="pb-field"><label>Tareas en Paralelo</label><div class="pb-par-editor">`;
     const pKeys = Object.keys(step.parallel || {});
     pKeys.forEach(k => {
-      html += `<div class="pb-par-editor-row"><div style="display:flex;justify-content:space-between;align-items:center"><select style="width:70%" onchange="pbUpdatePar('${step.id}', '${k}', 'agent', this.value)"><option value="">-- Agente --</option>${agentsOpts.replace(`value="${k}"`, `value="${k}" selected`)}</select><i class="ti ti-trash action-icon danger" onclick="pbDelPar('${step.id}', '${k}')"></i></div><textarea class="code-font" placeholder="Prompt para este agente" onchange="pbUpdatePar('${step.id}', '${k}', 'prompt', this.value)">${step.parallel[k]}</textarea></div>`;
+      html += `<div class="pb-par-editor-row"><div style="display:flex;justify-content:space-between;align-items:center"><select style="width:70%" onchange="pbUpdatePar('${step.id}', '${k}', 'agent', this.value)"><option value="">-- Asistente --</option>${agentsOpts.replace(`value="${k}"`, `value="${k}" selected`)}</select><i class="ti ti-trash action-icon danger" onclick="pbDelPar('${step.id}', '${k}')"></i></div><textarea class="code-font" placeholder="Prompt para este asistente" onchange="pbUpdatePar('${step.id}', '${k}', 'prompt', this.value)">${step.parallel[k]}</textarea></div>`;
     });
-    html += `<button class="btn" style="width:100%;justify-content:center" onclick="pbAddPar('${step.id}')"><i class="ti ti-plus"></i> Añadir Agente</button></div></div>
-    <div class="pb-ref-box">En paralelos, las salidas se unen. Úsalas en nodos siguientes como <code>\${steps.ID.outputs.AGENTE}</code>.</div>`;
+    html += `<button class="btn" style="width:100%;justify-content:center" onclick="pbAddPar('${step.id}')"><i class="ti ti-plus"></i> Añadir Asistente</button></div></div>
+    <div class="pb-ref-box">En paralelos, las salidas se unen. Úsalas en nodos siguientes como <code>\${steps.ID.outputs.ASISTENTE}</code>.</div>`;
   }
   
   html += `<div class="pb-inspector-actions"><button class="btn" onclick="pbMoveStep('${step.id}', -1)"><i class="ti ti-arrow-left"></i> Mover</button><button class="btn" onclick="pbMoveStep('${step.id}', 1)">Mover <i class="ti ti-arrow-right"></i></button><button class="btn danger" style="grid-column:1/-1" onclick="pbDelStep('${step.id}')"><i class="ti ti-trash"></i> Eliminar Nodo</button></div>`;
@@ -1014,7 +1014,7 @@ function pbUpdateStep(id, field, val) {
   step[field] = val;
   pbRenderCanvas(); pbAutoSave();
 }
-function pbAddPar(id) { const step = pbSteps.find(s=>s.id===id); if(!step.parallel) step.parallel={}; const temp = `agente_${Object.keys(step.parallel).length+1}`; step.parallel[temp]=""; pbInspector(); pbRenderCanvas(); pbAutoSave(); }
+function pbAddPar(id) { const step = pbSteps.find(s=>s.id===id); if(!step.parallel) step.parallel={}; const temp = `asistente_${Object.keys(step.parallel).length+1}`; step.parallel[temp]=""; pbInspector(); pbRenderCanvas(); pbAutoSave(); }
 function pbUpdatePar(id, oldKey, field, val) {
   const step = pbSteps.find(s=>s.id===id);
   if (field==='agent') {
@@ -1153,7 +1153,7 @@ function pbInputKeydown(e) {
 async function runWorkflow(name) {
   document.getElementById('playbook-modal').classList.remove('open');
   const runner = agents[selected];
-  if (!runner || runner.card?.name !== 'workflow_runner') { alert('Selecciona el agente workflow_runner'); return; }
+  if (!runner || runner.card?.name !== 'workflow_runner') { alert('Selecciona el asistente workflow_runner'); return; }
   const inputEl = document.getElementById('msg-input');
   const initialValue = inputEl.value.trim();
   const userMsg = await pbOpenInputModal(name, initialValue);
@@ -1197,7 +1197,7 @@ async function _executeWorkflow(runner, userMsg, workflowName) {
 async function runPlaybook(name) {
   document.getElementById('playbook-modal').classList.remove('open');
   const runner = Object.values(agents).find(a => a.card?.name === 'playbook_runner');
-  if (!runner) { alert('No se encontró el agente playbook_runner'); return; }
+  if (!runner) { alert('No se encontró el asistente playbook_runner'); return; }
   const inputEl = document.getElementById('msg-input');
   const initialValue = inputEl.value.trim();
   const userMsg = await pbOpenInputModal(name, initialValue);
@@ -1339,10 +1339,10 @@ async function acPreviewAgent() {
 
 async function acCreateAgent() { 
   try { 
-    acSetStatus('Creando agente...'); 
+    acSetStatus('Creando asistente...'); 
     const data = await acPost('/create', acPayload()); 
-    acSetStatus('Agente creado'); 
-    acToast(`Agente creado: ${data.agent_name}\n\n${(data.next_steps || []).join('\n')}`); 
+    acSetStatus('Asistente creado'); 
+    acToast(`Asistente creado: ${data.agent_name}\n\n${(data.next_steps || []).join('\n')}`); 
     await acPreviewAgent(); 
   } catch (error) { 
     acSetStatus('Error'); 
@@ -1366,3 +1366,4 @@ document.getElementById('pb-delete-modal')?.addEventListener('click', e => {
 
 // Start app
 window.onload = () => { checkAuth(); };
+
