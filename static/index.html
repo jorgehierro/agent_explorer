@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Agent Explorer</title>
+  <title>Assistant Explorer</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
@@ -17,7 +17,7 @@
 <!-- LOGIN OVERLAY -->
 <div class="login-overlay" id="login-overlay">
   <div class="login-card">
-    <h2><i class="ti ti-topology-star-3"></i> Agent Explorer</h2>
+    <h2><i class="ti ti-topology-star-3"></i> Assistant Explorer</h2>
     <div class="login-field">
       <label>Usuario</label>
       <input type="text" id="login-username" placeholder="admin" onkeydown="if(event.key==='Enter') document.getElementById('login-password').focus()" />
@@ -34,7 +34,7 @@
 </div>
 
 <header>
-  <h1><i class="ti ti-topology-star-3"></i> Agent Explorer</h1>
+  <h1><i class="ti ti-topology-star-3"></i> Assistant Explorer</h1>
   <div class="discover-form">
     <input class="url" id="base-url" placeholder="http://10.139.90.120" value="http://10.139.90.120" />
     <span style="font-size:13px;color:var(--text3)">puertos</span>
@@ -48,7 +48,7 @@
 
   <div style="display:flex;gap:6px;align-items:center">
     <button class="app-tab-btn active" id="tab-explorer" onclick="switchMainTab('explorer')"><i class="ti ti-message"></i> Explorer</button>
-    <button class="app-tab-btn" id="tab-creator" onclick="switchMainTab('creator')"><i class="ti ti-robot"></i> Creador de agentes</button>
+    <button class="app-tab-btn" id="tab-creator" onclick="switchMainTab('creator')"><i class="ti ti-robot"></i> Creador de asistentes</button>
     <button class="app-tab-btn admin-only" id="tab-admin" onclick="switchMainTab('admin')" style="display:none"><i class="ti ti-shield"></i> Admin</button>
   </div>
 
@@ -73,7 +73,7 @@
 <div class="main" id="explorer-view">
   <div class="sidebar">
     <div class="sidebar-tabs">
-      <div class="sidebar-tab active" onclick="switchSidebarTab('agents')" id="st-agents">Agentes <span id="agent-count"></span></div>
+      <div class="sidebar-tab active" onclick="switchSidebarTab('agents')" id="st-agents">Asistentes <span id="agent-count"></span></div>
       <div class="sidebar-tab" onclick="switchSidebarTab('automations')" id="st-automations">Workflows <span id="auto-count"></span></div>
     </div>
     <div class="agents-list" id="agents-list">
@@ -111,7 +111,7 @@
       <div class="empty-state" style="flex:1; margin-top: 10vh;">
         <i class="ti ti-message-dots" style="font-size: 64px;"></i>
         <h2 style="color:var(--text); font-weight:500; font-size:18px; margin-bottom:8px;">Sin mensajes</h2>
-        <p>Selecciona un agente de la barra lateral para empezar a chatear.</p>
+        <p>Selecciona un asistente de la barra lateral para empezar a chatear.</p>
       </div>
     </div>
 
@@ -136,9 +136,9 @@
 
 <div class="creator-view" id="agent-creator-view">
   <section class="ac-panel">
-    <div class="ac-head"><div class="ac-title"><i class="ti ti-forms"></i> Datos del agente</div><button class="btn" onclick="acLoadToolProfiles()"><i class="ti ti-refresh"></i> Perfiles</button></div>
+    <div class="ac-head"><div class="ac-title"><i class="ti ti-forms"></i> Datos del asistente</div><button class="btn" onclick="acLoadToolProfiles()"><i class="ti ti-refresh"></i> Perfiles</button></div>
     <div class="ac-body">
-      <div class="ac-field"><label>Nombre del agente</label><input id="ac-agent-name" placeholder="mi_nuevo_agente" oninput="acSyncEnvHint()" /><small>Usa snake_case. Ejemplo: <code>ticket_enricher</code>.</small></div>
+      <div class="ac-field"><label>Nombre del asistente</label><input id="ac-agent-name" placeholder="mi_nuevo_agente" oninput="acSyncEnvHint()" /><small>Usa snake_case. Ejemplo: <code>ticket_enricher</code>.</small></div>
       <div class="ac-field"><label>Descripción</label><input id="ac-description" placeholder="Describe qué hace el agente" /></div>
       <div class="ac-row"><div class="ac-field"><label>Capabilities</label><input id="ac-capabilities" value="tool_executing, reporting" /></div><div class="ac-field"><label>Puerto</label><input id="ac-port" type="number" min="1" max="65535" placeholder="9020" /></div></div>
       <div class="ac-field"><label>Variable de puerto</label><input id="ac-env-hint" disabled /></div>
@@ -146,7 +146,7 @@
       <div class="ac-field" id="ac-tool-profile-wrap" style="display:none"><label>Perfil de tools</label><div style="display:flex;gap:8px"><select id="ac-tool-profile"><option value="">Cargando perfiles...</option></select><button class="btn" type="button" onclick="acLoadToolProfiles()">Actualizar</button></div></div>
       <div class="ac-field"><label>Prompt</label><textarea id="ac-prompt" placeholder="Pega aquí el system prompt..."></textarea></div>
       <label class="ac-check"><input id="ac-overwrite" type="checkbox" /> Sobrescribir si ya existe</label>
-      <div class="ac-actions"><span class="ac-status" id="ac-status">Listo</span><button class="btn" onclick="acPreviewAgent()"><i class="ti ti-eye"></i> Preview</button><button class="btn primary" onclick="acCreateAgent()"><i class="ti ti-sparkles"></i> Crear agente</button></div>
+      <div class="ac-actions"><span class="ac-status" id="ac-status">Listo</span><button class="btn" onclick="acPreviewAgent()"><i class="ti ti-eye"></i> Preview</button><button class="btn primary" onclick="acCreateAgent()"><i class="ti ti-sparkles"></i> Crear asistente</button></div>
     </div>
   </section>
   <section class="ac-panel"><div class="ac-head"><div class="ac-title"><i class="ti ti-code"></i> Preview de archivos</div></div><div class="ac-tabs" id="ac-tabs"></div><div class="ac-preview" id="ac-preview">Pulsa Preview para ver los archivos generados.</div></section>
@@ -241,7 +241,7 @@
         <!-- Paleta Agentes -->
         <div class="pb-flow-panel">
           <div class="pb-flow-panel-head">
-            <div class="pb-flow-panel-title"><i class="ti ti-components"></i> Agentes Disponibles</div>
+            <div class="pb-flow-panel-title"><i class="ti ti-components"></i> Asistentes Disponibles</div>
           </div>
           <input class="pb-agent-search" placeholder="Filtrar..." oninput="pbFilterAgents(this.value)" />
           <div class="pb-agent-palette" id="pb-agent-palette"></div>
@@ -368,7 +368,7 @@
     <div class="perm-section">
       <div class="perm-section-title"><i class="ti ti-shield-lock"></i> Permisos Especiales</div>
       <label class="perm-check">
-        <input type="checkbox" id="um-perm-creator" /> Acceso a Creador de Agentes
+        <input type="checkbox" id="um-perm-creator" /> Acceso a Creador de asistentes
       </label>
       <label class="perm-check">
         <input type="checkbox" id="um-perm-playbooks" /> Acceso a Playbooks
@@ -377,7 +377,7 @@
         <input type="checkbox" id="um-perm-workflows" /> Acceso a Workflows
       </label>
       <div class="perm-agents-wrapper">
-        <label>Agentes Permitidos</label>
+        <label>Asistentes Permitidos</label>
         <div id="um-perm-agents-list" class="perm-agents-list">
           <!-- Generado por JS -->
         </div>
@@ -412,3 +412,4 @@
 <script src="/js/app.js"></script>
 </body>
 </html>
+
