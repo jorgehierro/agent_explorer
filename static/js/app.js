@@ -683,20 +683,20 @@ async function deleteUser(id, username) {
 function populateAgentCheckboxes(agentsStr) {
   const container = document.getElementById('um-perm-agents-list');
   const allAgents = Object.keys(agents);
-  let html = `<label style="display:flex; align-items:center; gap:6px; font-weight:normal; margin-bottom:4px; font-size:12px;">
+  let html = `<label class="perm-agent-pill">
     <input type="checkbox" id="um-perm-agent-all" value="*" onchange="toggleAllAgents(this)" ${agentsStr === '*' ? 'checked' : ''} />
-    <strong>Todos los agentes (*)</strong>
+    <i class="ti ti-star"></i> Todos (*)
   </label>`;
   
   if (allAgents.length === 0) {
-    html += `<div style="font-size:11px; color:var(--text3); margin-top:4px;">No hay agentes descubiertos.</div>`;
+    html += `<div style="font-size:11px; color:var(--text3); margin-top:4px; grid-column:1/-1;">No hay agentes descubiertos.</div>`;
   } else {
     const allowed = agentsStr === '*' ? allAgents : agentsStr.split(',').map(s => s.trim());
     allAgents.forEach(a => {
       const isChecked = agentsStr === '*' || allowed.includes(a);
-      html += `<label style="display:flex; align-items:center; gap:6px; font-weight:normal; margin-bottom:4px; font-size:12px; margin-left:14px;">
+      html += `<label class="perm-agent-pill">
         <input type="checkbox" class="um-perm-agent-cb" value="${escapeHtml(a)}" ${isChecked ? 'checked' : ''} onchange="updateAllAgentsCheckbox()" />
-        ${escapeHtml(a)}
+        <i class="ti ti-robot"></i> ${escapeHtml(a)}
       </label>`;
     });
   }
