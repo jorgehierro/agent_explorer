@@ -250,6 +250,31 @@ async function discoverAgents() {
     if(r.ok) {
       const data = await r.json();
       data.agents.forEach(a => { agents[a.name] = a; });
+      
+      const runnerKey = Object.keys(agents).find(k => agents[k].card?.name === 'workflow_runner' || k === 'workflow_runner');
+      if (runnerKey) {
+        const runner = agents[runnerKey];
+        try {
+          const wr = await fetch('/api/proxy/fetch', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ url: runner.url + '/workflows', method: 'GET' }) });
+          if (wr.ok) {
+            const wdata = await wr.json();
+            const wkeys = Array.isArray(wdata) ? wdata : Object.keys(wdata || {});
+            wkeys.forEach(k => {
+              const meta = Array.isArray(wdata) ? {} : (wdata[k] || {});
+              agents[`wf_${k}`] = {
+                name: k,
+                url: runner.url,
+                port: runner.port,
+                ok: true,
+                isWorkflowInstance: true,
+                workflowName: k,
+                card: { name: 'workflow_instance', description: meta.description || meta.module || `Workflow: ${k}`, properties: {} }
+              };
+            });
+          }
+        } catch(e) { console.error("Workflow fetch error", e); }
+        delete agents[runnerKey];
+      }
     }
   } catch(e) { console.error("Discovery error", e); }
 
@@ -273,9 +298,10 @@ function switchSidebarTab(tab) {
 }
 
 function getAgentKind(name) {
-  const cardName = agents[name]?.card?.name || name || '';
+  const a = agents[name];
+  if (a?.isWorkflowInstance) return 'workflow';
+  const cardName = a?.card?.name || name || '';
   if (cardName === 'workflow_runner') return 'workflow';
-  if (cardName === 'playbook_runner') return 'playbook';
   return 'generic';
 }
 
@@ -344,29 +370,6 @@ function selectedAgentKind() {
   return getAgentKind(selected);
 }
 
-function updateAutomationButtonForSelectedAgent() {
-  const label = document.getElementById('automation-btn-label');
-  const icon = document.getElementById('automation-btn-icon');
-  const btn = document.getElementById('automation-btn');
-  if (!label || !icon || !btn) return;
-  const kind = selectedAgentKind();
-  const perms = currentUser?.permissions || { tabs: [], agents: '*' };
-  const isAdmin = currentUser?.role === 'admin';
-  
-  if (kind === 'workflow') {
-    btn.style.display = (isAdmin || perms.tabs.includes('workflows')) ? 'inline-flex' : 'none';
-    label.textContent = 'Workflows';
-    icon.className = 'ti ti-route';
-    btn.title = 'Workflows';
-  } else if (kind === 'playbook') {
-    btn.style.display = (isAdmin || perms.tabs.includes('playbooks')) ? 'inline-flex' : 'none';
-    label.textContent = 'Playbooks';
-    icon.className = 'ti ti-list-check';
-    btn.title = 'Playbooks';
-  } else {
-    btn.style.display = 'none';
-  }
-}
 
 function selectAgent(name) {
   selected = name;
@@ -391,7 +394,6 @@ function selectAgent(name) {
     statusEl.innerHTML = '<i class="ti ti-circle-x" style="font-size:13px"></i> inactivo';
   }
 
-  updateAutomationButtonForSelectedAgent();
   renderExtraFields(a.card?.input_schema || null);
 
   const input = document.getElementById('msg-input');
@@ -483,6 +485,9 @@ async function sendMessage() {
   const schema = a.card?.input_schema || null;
   const extraFields = getExtraFieldsValues(schema);
   const body = { url: a.url, messages: msg, ...extraFields };
+  if (a.isWorkflowInstance) {
+    body.workflow_name = a.workflowName;
+  }
 
   try {
     const r = await fetch('/api/proxy/send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
@@ -733,528 +738,6 @@ async function loadAuditLogs() {
   } catch(e) { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--red)">Error al cargar logs</td></tr>'; }
 }
 
-// === PLAYBOOK BUILDER ===
-let pbSteps = [];
-let pbZoomLevel = 1.0;
-let pbPanX = 0; let pbPanY = 0;
-let isPanning = false; let startPanX = 0; let startPanY = 0;
-let draggedNode = null;
-let pbSelectedId = null;
-
-function pbAutoSave() {
-  const pbData = {
-    name: document.getElementById('pb-name').value,
-    desc: document.getElementById('pb-desc').value,
-    steps: pbSteps,
-    panX: pbPanX, panY: pbPanY, zoom: pbZoomLevel
-  };
-  localStorage.setItem('agent_explorer_pb_draft', JSON.stringify(pbData));
-}
-
-function pbImportDraft() {
-  const d = localStorage.getItem('agent_explorer_pb_draft');
-  if(!d) { showToast('No hay borrador guardado', 'error'); return; }
-  try {
-    const pbData = JSON.parse(d);
-    document.getElementById('pb-name').value = pbData.name || '';
-    document.getElementById('pb-desc').value = pbData.desc || '';
-    pbSteps = pbData.steps || [];
-    pbZoomLevel = pbData.zoom || 1.0;
-    pbPanX = pbData.panX || 0; pbPanY = pbData.panY || 0;
-    switchPbTab('create');
-    pbRenderCanvas();
-    pbUpdateTransform();
-    showToast('Borrador cargado');
-  } catch(e) { showToast('Error cargando borrador', 'error'); }
-}
-
-function switchPbTab(t) {
-  document.querySelectorAll('.pb-tab').forEach(b => b.classList.remove('active'));
-  document.querySelectorAll('.pb-section').forEach(s => s.classList.remove('active'));
-  document.getElementById('pb-btn-'+t).classList.add('active');
-  document.getElementById('pb-tab-'+t).classList.add('active');
-  if (t === 'create') {
-    pbPopulatePalette('');
-    setTimeout(() => { pbRenderCanvas(); pbUpdateYaml(); }, 50);
-  } else { pbRefreshList(); }
-}
-
-function openPlaybookModal() {
-  const kind = selectedAgentKind();
-  const tabs = document.getElementById('pb-tabs-container');
-  const modalBox = document.querySelector('#playbook-modal .modal');
-  
-  document.getElementById('pb-modal-title').innerHTML = kind === 'workflow' ? '<i class="ti ti-route"></i> Workflows' : '<i class="ti ti-list-check"></i> Playbooks';
-  
-  if (kind === 'workflow') {
-    if(tabs) tabs.style.display = 'none';
-    modalBox.classList.remove('wide');
-    modalBox.classList.add('medium');
-    switchPbTab('run');
-  } else {
-    if(tabs) tabs.style.display = 'flex';
-    modalBox.classList.add('wide');
-    modalBox.classList.remove('medium');
-    document.getElementById('pb-btn-run').innerHTML = '<i class="ti ti-player-play"></i> Ejecutar';
-    document.getElementById('pb-btn-create').innerHTML = '<i class="ti ti-pencil"></i> Diseñador';
-    document.getElementById('pb-btn-create').style.display = 'block';
-    if (!document.getElementById('pb-tab-run').classList.contains('active') && !document.getElementById('pb-tab-create').classList.contains('active')) {
-      switchPbTab('run');
-    }
-  }
-  
-  document.getElementById('playbook-modal').classList.add('open');
-  pbRefreshList();
-}
-
-function pbZoom(delta) {
-  pbZoomLevel = Math.max(0.4, Math.min(2.0, pbZoomLevel + delta));
-  pbUpdateTransform();
-}
-function pbResetView() { pbZoomLevel = 1.0; pbPanX = 0; pbPanY = 0; pbUpdateTransform(); }
-function pbUpdateTransform() {
-  document.getElementById('pb-zoom-label').innerText = Math.round(pbZoomLevel * 100) + '%';
-  document.getElementById('pb-flow-plane').style.transform = `translate(${pbPanX}px, ${pbPanY}px) scale(${pbZoomLevel})`;
-  pbAutoSave();
-}
-
-function pbCanvasPanStart(e) {
-  if(e.target.closest('.pb-node') || e.target.closest('.pb-mini-btn')) return;
-  isPanning = true;
-  startPanX = e.clientX - pbPanX;
-  startPanY = e.clientY - pbPanY;
-  document.getElementById('pb-flow-canvas').classList.add('panning');
-}
-window.addEventListener('mousemove', e => {
-  if(!isPanning) return;
-  pbPanX = e.clientX - startPanX;
-  pbPanY = e.clientY - startPanY;
-  pbUpdateTransform();
-});
-window.addEventListener('mouseup', () => {
-  isPanning = false;
-  const canvas = document.getElementById('pb-flow-canvas');
-  if(canvas) canvas.classList.remove('panning');
-});
-
-function pbPopulatePalette(filter) {
-  const p = document.getElementById('pb-agent-palette');
-  const arr = Object.values(agents).filter(a => a.ok && a.name.toLowerCase().includes(filter.toLowerCase()));
-  if(!arr.length) { p.innerHTML = '<div style="color:var(--text3);font-size:12px;text-align:center;padding:10px">No hay asistentes disponibles.</div>'; return; }
-  p.innerHTML = arr.map(a => `<div class="pb-agent-chip" draggable="true" ondragstart="pbDragStart(event, '${a.name}')"><div class="agent-dot"></div><div>${a.name}</div><div class="agent-meta">:${a.port}</div></div>`).join('');
-}
-function pbFilterAgents(v) { pbPopulatePalette(v); }
-function pbDragStart(e, agentName) { e.dataTransfer.setData('text/plain', agentName); }
-function pbDropCanvas(e) {
-  e.preventDefault();
-  const agentName = e.dataTransfer.getData('text/plain');
-  if (!agentName) return;
-  
-  const rect = document.getElementById('pb-flow-plane').getBoundingClientRect();
-  // Adjust for pan and zoom to place exactly under cursor
-  const x = (e.clientX - rect.left) / pbZoomLevel;
-  const y = (e.clientY - rect.top) / pbZoomLevel;
-  
-  const stepId = `step_${pbSteps.length + 1}`;
-  pbSteps.push({ id: stepId, type: 'sequential', agent: agentName, prompt: '', parallel: {}, pos: {x, y} });
-  pbSelectedId = stepId;
-  pbRenderCanvas();
-  pbSelectNode(stepId);
-  pbAutoSave();
-}
-
-function pbRenderCanvas() {
-  const container = document.getElementById('pb-nodes-container');
-  const svg = document.getElementById('pb-flow-svg');
-  const empty = document.getElementById('pb-canvas-empty');
-  
-  if (pbSteps.length === 0) {
-    empty.style.display = 'block'; container.innerHTML = ''; svg.innerHTML = '';
-    pbInspector(); pbUpdateYaml(); return;
-  }
-  
-  empty.style.display = 'none';
-  container.innerHTML = pbSteps.map(s => {
-    const isSel = s.id === pbSelectedId ? 'selected' : '';
-    const isPar = s.type === 'parallel';
-    const warning = (!s.agent && !isPar) ? `<div class="pb-node-warning" title="Asistente faltante"><i class="ti ti-alert-triangle"></i></div>` : '';
-    const desc = isPar ? `${Object.keys(s.parallel || {}).length} tareas en paralelo` : (s.agent || 'Sin asistente asignado');
-    const msgPrev = s.prompt ? `<div class="pb-node-message">${escapeHtml(s.prompt)}</div>` : '';
-    return `<div class="pb-node ${isSel} ${isPar ? 'parallel' : ''}" id="node-${s.id}" style="left:${s.pos.x}px;top:${s.pos.y}px" onmousedown="pbNodeMouseDown(event, '${s.id}')">
-      ${warning}
-      <div class="pb-port in"></div><div class="pb-port out"></div>
-      <div class="pb-node-head">
-        <div class="pb-node-icon"><i class="ti ${isPar ? 'ti-route' : 'ti-robot'}"></i></div>
-        <div style="min-width:0"><div class="pb-node-title">${s.id}</div><div class="pb-node-kind">${s.type}</div></div>
-      </div>
-      <div class="pb-node-body"><div>${desc}</div>${msgPrev}</div>
-      <div class="pb-node-foot"><span>X: ${Math.round(s.pos.x)}</span><span>Y: ${Math.round(s.pos.y)}</span></div>
-    </div>`;
-  }).join('');
-  
-  pbDrawLines();
-  if (pbSelectedId) pbInspector();
-  pbUpdateYaml();
-}
-
-function pbDrawLines() {
-  const svg = document.getElementById('pb-flow-svg');
-  let lines = '';
-  for (let i = 0; i < pbSteps.length - 1; i++) {
-    const s1 = pbSteps[i], s2 = pbSteps[i+1];
-    // Center point of out port
-    const x1 = s1.pos.x + 260; // node width
-    const y1 = s1.pos.y + 58;  // rough center height
-    // Center point of in port
-    const x2 = s2.pos.x;
-    const y2 = s2.pos.y + 58;
-    
-    // Smooth bezier curve
-    const cX = (x1 + x2) / 2;
-    const path = `M ${x1} ${y1} C ${cX} ${y1}, ${cX} ${y2}, ${x2} ${y2}`;
-    lines += `<path class="pb-flow-link-shadow" d="${path}"></path><path class="pb-flow-link" d="${path}"></path>`;
-  }
-  svg.innerHTML = lines;
-}
-
-function pbNodeMouseDown(e, id) {
-  e.stopPropagation();
-  pbSelectedId = id;
-  pbRenderCanvas();
-  pbSelectNode(id);
-  
-  const nodeEl = document.getElementById(`node-${id}`);
-  nodeEl.classList.add('dragging');
-  const startX = e.clientX, startY = e.clientY;
-  const step = pbSteps.find(s => s.id === id);
-  const startPosX = step.pos.x, startPosY = step.pos.y;
-  
-  const onMove = ev => {
-    step.pos.x = startPosX + (ev.clientX - startX) / pbZoomLevel;
-    step.pos.y = startPosY + (ev.clientY - startY) / pbZoomLevel;
-    nodeEl.style.left = `${step.pos.x}px`;
-    nodeEl.style.top = `${step.pos.y}px`;
-    pbDrawLines();
-  };
-  const onUp = () => {
-    nodeEl.classList.remove('dragging');
-    window.removeEventListener('mousemove', onMove);
-    window.removeEventListener('mouseup', onUp);
-    pbAutoSave();
-  };
-  window.addEventListener('mousemove', onMove);
-  window.addEventListener('mouseup', onUp);
-}
-
-function pbSelectNode(id) { pbSelectedId = id; pbInspector(); }
-function pbClearCanvas() { if(!confirm("¿Borrar todo el lienzo?")) return; pbSteps = []; pbSelectedId = null; pbRenderCanvas(); pbAutoSave(); }
-
-function pbAutoLayout() {
-  if (!pbSteps.length) return;
-  const startX = 50, startY = 100, xGap = 340;
-  pbSteps.forEach((s, i) => {
-    s.pos = { x: startX + (i * xGap), y: startY };
-  });
-  pbPanX = 0; pbPanY = 0; pbZoomLevel = 1.0;
-  pbUpdateTransform();
-  pbRenderCanvas();
-  pbAutoSave();
-  showToast("Layout reordenado");
-}
-
-function pbMoveStep(id, dir) {
-  const idx = pbSteps.findIndex(s=>s.id === id);
-  if (idx < 0) return;
-  if (dir === -1 && idx > 0) { const temp = pbSteps[idx]; pbSteps[idx] = pbSteps[idx-1]; pbSteps[idx-1] = temp; }
-  else if (dir === 1 && idx < pbSteps.length-1) { const temp = pbSteps[idx]; pbSteps[idx] = pbSteps[idx+1]; pbSteps[idx+1] = temp; }
-  pbAutoLayout();
-}
-function pbDelStep(id) { pbSteps = pbSteps.filter(s=>s.id !== id); if(pbSelectedId===id) pbSelectedId=null; pbRenderCanvas(); pbAutoSave(); }
-
-function pbInspector() {
-  const panel = document.getElementById('pb-inspector');
-  const sub = document.getElementById('pb-ins-id');
-  if(!pbSelectedId) { sub.textContent=''; panel.innerHTML='<div class="pb-inspector-empty">Selecciona un nodo para editarlo.</div>'; return; }
-  
-  const step = pbSteps.find(s=>s.id===pbSelectedId);
-  sub.textContent = step.id;
-  
-  const agentsOpts = Object.keys(agents).filter(k=>agents[k].ok).map(k=>`<option value="${k}" ${step.agent===k?'selected':''}>${k}</option>`).join('');
-  let html = `
-    <div class="pb-field"><label>ID del Nodo</label><input type="text" value="${step.id}" onchange="pbUpdateStep('${step.id}', 'id', this.value)" /></div>
-    <div class="pb-field"><label>Tipo de ejecución</label><select onchange="pbUpdateStep('${step.id}', 'type', this.value)"><option value="sequential" ${step.type==='sequential'?'selected':''}>Sequential (Normal)</option><option value="parallel" ${step.type==='parallel'?'selected':''}>Parallel (Múltiples asistentes)</option></select></div>
-  `;
-  
-  if (step.type === 'sequential') {
-    html += `
-      <div class="pb-field"><label>Asistente Destino</label><select onchange="pbUpdateStep('${step.id}', 'agent', this.value)"><option value="">-- Seleccionar --</option>${agentsOpts}</select></div>
-      <div class="pb-field"><label>Mensaje (Prompt)</label><textarea class="code-font" onchange="pbUpdateStep('${step.id}', 'prompt', this.value)" placeholder="Escribe el prompt... Usa \${inputs} para ref.">${step.prompt || ''}</textarea></div>
-      <div class="pb-ref-box">Variables disponibles:<br/><code>\${inputs.initial}</code> - Entrada inicial<br/><code>\${steps.ID.output}</code> - Salida de un nodo</div>
-    `;
-  } else {
-    html += `<div class="pb-field"><label>Tareas en Paralelo</label><div class="pb-par-editor">`;
-    const pKeys = Object.keys(step.parallel || {});
-    pKeys.forEach(k => {
-      html += `<div class="pb-par-editor-row"><div style="display:flex;justify-content:space-between;align-items:center"><select style="width:70%" onchange="pbUpdatePar('${step.id}', '${k}', 'agent', this.value)"><option value="">-- Asistente --</option>${agentsOpts.replace(`value="${k}"`, `value="${k}" selected`)}</select><i class="ti ti-trash action-icon danger" onclick="pbDelPar('${step.id}', '${k}')"></i></div><textarea class="code-font" placeholder="Prompt para este asistente" onchange="pbUpdatePar('${step.id}', '${k}', 'prompt', this.value)">${step.parallel[k]}</textarea></div>`;
-    });
-    html += `<button class="btn" style="width:100%;justify-content:center" onclick="pbAddPar('${step.id}')"><i class="ti ti-plus"></i> Añadir Asistente</button></div></div>
-    <div class="pb-ref-box">En paralelos, las salidas se unen. Úsalas en nodos siguientes como <code>\${steps.ID.outputs.ASISTENTE}</code>.</div>`;
-  }
-  
-  html += `<div class="pb-inspector-actions"><button class="btn" onclick="pbMoveStep('${step.id}', -1)"><i class="ti ti-arrow-left"></i> Mover</button><button class="btn" onclick="pbMoveStep('${step.id}', 1)">Mover <i class="ti ti-arrow-right"></i></button><button class="btn danger" style="grid-column:1/-1" onclick="pbDelStep('${step.id}')"><i class="ti ti-trash"></i> Eliminar Nodo</button></div>`;
-  panel.innerHTML = html;
-}
-
-function pbUpdateStep(id, field, val) {
-  const step = pbSteps.find(s=>s.id===id);
-  if (field==='id') {
-    if(!val || pbSteps.find(x=>x.id===val)) return;
-    pbSelectedId = val;
-  }
-  step[field] = val;
-  pbRenderCanvas(); pbAutoSave();
-}
-function pbAddPar(id) { const step = pbSteps.find(s=>s.id===id); if(!step.parallel) step.parallel={}; const temp = `asistente_${Object.keys(step.parallel).length+1}`; step.parallel[temp]=""; pbInspector(); pbRenderCanvas(); pbAutoSave(); }
-function pbUpdatePar(id, oldKey, field, val) {
-  const step = pbSteps.find(s=>s.id===id);
-  if (field==='agent') {
-    const prompt = step.parallel[oldKey]; delete step.parallel[oldKey];
-    if(val) step.parallel[val] = prompt;
-  } else { step.parallel[oldKey] = val; }
-  pbRenderCanvas(); pbAutoSave();
-}
-function pbDelPar(id, key) { const step = pbSteps.find(s=>s.id===id); delete step.parallel[key]; pbInspector(); pbRenderCanvas(); pbAutoSave(); }
-
-function pbBuildYamlStr() {
-  let y = `name: ${document.getElementById('pb-name').value || 'sin_nombre'}\n`;
-  const desc = document.getElementById('pb-desc').value;
-  if(desc) y += `description: "${escapeJsString(desc)}"\n`;
-  y += `steps:\n`;
-  pbSteps.forEach(s => {
-    y += `  - id: ${s.id}\n`;
-    if (s.type === 'parallel') {
-      y += `    type: parallel\n    parallel:\n`;
-      Object.keys(s.parallel||{}).forEach(k => { y += `      ${k}: |\n        ${s.parallel[k].split('\n').join('\n        ')}\n`; });
-    } else {
-      y += `    agent: ${s.agent || 'null'}\n    prompt: |\n      ${(s.prompt||'').split('\n').join('\n      ')}\n`;
-    }
-  });
-  return y;
-}
-
-function pbUpdateYaml() {
-  const pre = document.getElementById('pb-yaml-preview');
-  if(!pre) return;
-  const yaml = pbBuildYamlStr();
-  // Basic Regex Syntax Highlighting for YAML
-  const html = yaml
-    .replace(/^(.*?:)/gm, '<span class="yaml-key">$1</span>')
-    .replace(/(:\s*)(["'].*?["'])/g, '$1<span class="yaml-string">$2</span>');
-  pre.innerHTML = html;
-}
-
-async function pbCreatePlaybook() {
-  if (!selected) return;
-  const name = document.getElementById('pb-name').value.trim();
-  if (!name || !pbSteps.length) { alert("Nombre y al menos 1 paso requerido"); return; }
-  const yaml = pbBuildYamlStr();
-  try {
-    const a = agents[selected];
-    const r = await fetch('/api/proxy/fetch', {
-      method: 'POST', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ url: `${a.url}/playbooks/${name}`, method: 'PUT', body: yaml, headers: {'Content-Type': 'text/plain'} })
-    });
-    if(r.ok) { showToast(`Playbook ${name} desplegado con éxito`); switchPbTab('run'); }
-    else { const err = await r.json(); alert('Error: ' + JSON.stringify(err)); }
-  } catch(e) { alert("Error de conexión"); }
-}
-
-async function pbRefreshList() {
-  if (!selected) return;
-  const list = document.getElementById('pb-list');
-  list.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text3)"><i class="ti ti-loader-2" style="animation:spin 1s linear infinite;font-size:24px"></i></div>';
-  try {
-    const a = agents[selected];
-    const isWorkflow = selectedAgentKind() === 'workflow';
-    const urlPath = isWorkflow ? '/workflows' : '/playbooks';
-    const r = await fetch('/api/proxy/fetch', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ url: a.url + urlPath, method: 'GET' }) });
-    
-    if (r.ok) {
-      const data = await r.json();
-      const keys = Array.isArray(data) ? data : Object.keys(data || {});
-      
-      if (!keys.length) { 
-        list.innerHTML = `<div class="empty-state"><i class="ti ti-list-search" style="font-size:24px; color:var(--text3); margin-bottom:8px; display:block;"></i><p>No hay ${urlPath.substring(1)} desplegados.</p></div>`; 
-        return; 
-      }
-      
-      list.innerHTML = keys.map(k => {
-        const meta = Array.isArray(data) ? {} : (data[k] || {});
-        const jsKey = escapeJsString(k);
-        const displayName = escapeHtml(meta.name || k);
-        const descText = meta.description || (isWorkflow && meta.module ? ('Módulo: ' + meta.module) : '');
-        const desc = descText ? `<div class="pb-desc">${escapeHtml(descText)}</div>` : '';
-        const stepsText = isWorkflow ? 'workflow' : `${Number(meta.steps || 0)} pasos`;
-        const onclick = isWorkflow ? `runWorkflow('${jsKey}')` : `runPlaybook('${jsKey}')`;
-        
-        return `
-        <div class="playbook-item">
-          <div class="pb-run-area" onclick="${onclick}" title="Ejecutar">
-            <div class="pb-run-main"><div class="pb-name">${displayName}</div>${desc}</div>
-            <span class="pb-steps">${stepsText}</span>
-            <i class="ti ti-player-play" style="font-size:13px;color:var(--text3)"></i>
-          </div>
-          ${!isWorkflow ? `<button class="pb-del-btn" onclick="pbAskDelete('${jsKey}')" title="Eliminar"><i class="ti ti-trash"></i></button>` : ''}
-        </div>
-        `;
-      }).join('');
-    } else {
-      list.innerHTML = `<div style="color:var(--red);text-align:center;padding:20px">Error al cargar la lista</div>`;
-    }
-  } catch(e) { list.innerHTML = `<div style="color:var(--red);text-align:center;padding:20px">Error de conexión</div>`; }
-}
-
-// --- PLAYBOOK INPUT MODAL (Promise-based, matches original) ---
-let pbInputResolver = null;
-function pbOpenInputModal(playbookLabel, initialValue) {
-  return new Promise(resolve => {
-    pbInputResolver = resolve;
-    const modal = document.getElementById('pb-input-modal');
-    const title = document.getElementById('pb-input-title');
-    const subtitle = document.getElementById('pb-input-subtitle');
-    const text = document.getElementById('pb-input-text');
-    const error = document.getElementById('pb-input-error');
-    title.textContent = `Ejecutar: ${playbookLabel}`;
-    subtitle.textContent = 'Introduce el dato de entrada que recibirá el playbook. Puedes revisar o editar el texto antes de ejecutarlo.';
-    text.value = initialValue || '';
-    error.textContent = '';
-    modal.classList.add('open');
-    setTimeout(() => { text.focus(); if (text.value) text.select(); }, 60);
-  });
-}
-function pbResolveInputModal(value) {
-  document.getElementById('pb-input-modal').classList.remove('open');
-  const resolve = pbInputResolver;
-  pbInputResolver = null;
-  if (resolve) resolve(value);
-}
-function pbInputCancel() { if (pbInputResolver) pbResolveInputModal(null); }
-function pbInputAccept() {
-  const text = document.getElementById('pb-input-text');
-  const error = document.getElementById('pb-input-error');
-  const value = text.value.trim();
-  if (!value) { error.textContent = 'Introduce un input para ejecutar el playbook.'; text.focus(); return; }
-  pbResolveInputModal(value);
-}
-function pbInputKeydown(e) {
-  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); pbInputAccept(); }
-}
-
-async function runWorkflow(name) {
-  document.getElementById('playbook-modal').classList.remove('open');
-  const runner = agents[selected];
-  if (!runner || runner.card?.name !== 'workflow_runner') { alert('Selecciona el asistente workflow_runner'); return; }
-  const inputEl = document.getElementById('msg-input');
-  const initialValue = inputEl.value.trim();
-  const userMsg = await pbOpenInputModal(name, initialValue);
-  if (!userMsg) return;
-  inputEl.value = ''; inputEl.style.height = 'auto';
-  await _executeWorkflow(runner, userMsg, name);
-}
-
-async function _executeWorkflow(runner, userMsg, workflowName) {
-  isLoading = true;
-  document.getElementById('msg-input').disabled = true;
-  document.getElementById('send-btn').disabled = true;
-  histories[selected].push({ role: 'user', content: `⚙ Workflow: ${workflowName}\n${userMsg}` });
-  histories[selected].push({ role: 'typing' });
-  renderMessages();
-  try {
-    const r = await fetch('/api/proxy/send', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url: runner.url, messages: userMsg, workflow_name: workflowName }),
-      signal: AbortSignal.timeout(3000000)
-    });
-    histories[selected] = histories[selected].filter(m => m.role !== 'typing');
-    if (!r.ok) {
-      const err = await r.text();
-      histories[selected].push({ role: 'error', content: `HTTP ${r.status}: ${err}` });
-    } else {
-      const data = await r.json();
-      histories[selected].push({ role: 'agent', content: data.result ?? JSON.stringify(data, null, 2) });
-    }
-  } catch(e) {
-    histories[selected] = histories[selected].filter(m => m.role !== 'typing');
-    histories[selected].push({ role: 'error', content: e.name === 'TimeoutError' ? 'Timeout' : `Error: ${e.message}` });
-  }
-  isLoading = false;
-  document.getElementById('msg-input').disabled = false;
-  document.getElementById('send-btn').disabled = false;
-  document.getElementById('msg-input').focus();
-  renderMessages();
-}
-
-async function runPlaybook(name) {
-  document.getElementById('playbook-modal').classList.remove('open');
-  const runner = Object.values(agents).find(a => a.card?.name === 'playbook_runner');
-  if (!runner) { alert('No se encontró el asistente playbook_runner'); return; }
-  const inputEl = document.getElementById('msg-input');
-  const initialValue = inputEl.value.trim();
-  const userMsg = await pbOpenInputModal(name, initialValue);
-  if (!userMsg) return;
-  inputEl.value = ''; inputEl.style.height = 'auto';
-  await _executePlaybook(runner, userMsg, { playbook_name: name }, name);
-}
-
-async function _executePlaybook(runner, userMsg, extra, label) {
-  isLoading = true;
-  document.getElementById('msg-input').disabled = true;
-  document.getElementById('send-btn').disabled = true;
-  histories[selected].push({ role: 'user', content: `▶ Playbook: ${label}\n${userMsg}` });
-  histories[selected].push({ role: 'typing' });
-  renderMessages();
-  try {
-    const r = await fetch('/api/proxy/send', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url: runner.url, messages: userMsg, ...extra }),
-      signal: AbortSignal.timeout(3000000)
-    });
-    histories[selected] = histories[selected].filter(m => m.role !== 'typing');
-    if (!r.ok) {
-      const err = await r.text();
-      histories[selected].push({ role: 'error', content: `HTTP ${r.status}: ${err}` });
-    } else {
-      const data = await r.json();
-      histories[selected].push({ role: 'playbook', playbook: data.playbook || label, trace: data.trace || [], result: data.result });
-    }
-  } catch(e) {
-    histories[selected] = histories[selected].filter(m => m.role !== 'typing');
-    histories[selected].push({ role: 'error', content: e.name === 'TimeoutError' ? 'Timeout' : `Error: ${e.message}` });
-  }
-  isLoading = false;
-  document.getElementById('msg-input').disabled = false;
-  document.getElementById('send-btn').disabled = false;
-  document.getElementById('msg-input').focus();
-  renderMessages();
-}
-
-let pbTargetDel = '';
-function pbAskDelete(name) {
-  pbTargetDel = name;
-  document.getElementById('pb-delete-name-display').textContent = name;
-  document.getElementById('pb-delete-modal').classList.add('open');
-}
-function pbCloseDeleteModal() { document.getElementById('pb-delete-modal').classList.remove('open'); }
-async function pbConfirmDelete() {
-  try {
-    const a = agents[selected];
-    const path = selectedAgentKind() === 'workflow' ? `/workflows/${pbTargetDel}` : `/playbooks/${pbTargetDel}`;
-    const r = await fetch('/api/proxy/fetch', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ url: a.url + path, method: 'DELETE' }) });
-    pbCloseDeleteModal();
-    if(r.ok) { showToast('Eliminado correctamente'); pbRefreshList(); } else alert('Error al eliminar');
-  } catch(e) { pbCloseDeleteModal(); alert('Error de conexión'); }
-}
-
 // --- AGENT CREATOR ---
 function acBase() { return `${document.getElementById('base-url').value.trim().replace(/\/$/, '')}:9097`; }
 function acSnake(value) { return String(value || '').trim().toLowerCase().replace(/[^a-z0-9_\-\s]/g, '').replace(/[\-\s]+/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, ''); }
@@ -1366,4 +849,5 @@ document.getElementById('pb-delete-modal')?.addEventListener('click', e => {
 
 // Start app
 window.onload = () => { checkAuth(); };
+
 

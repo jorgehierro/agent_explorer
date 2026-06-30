@@ -101,7 +101,7 @@
       <div class="ab-desc" id="ab-desc"></div>
       <div id="ab-caps"></div>
       <div class="status-badge" id="ab-status"></div>
-      <button class="btn" onclick="openPlaybookModal()" title="Automatizaciones" id="automation-btn"><i class="ti ti-list-check" id="automation-btn-icon"></i> <span id="automation-btn-label">Playbooks</span></button>
+      
       <button class="btn" onclick="clearChat()" title="Limpiar conversación">
         <i class="ti ti-trash"></i>
       </button>
@@ -205,132 +205,6 @@
   </div>
 </div>
 
-<!-- PLAYBOOK MODAL -->
-<div class="modal-overlay" id="playbook-modal">
-  <div class="modal wide pb-flow-modal">
-    <div style="display:flex; justify-content:space-between; align-items:center; padding-right:18px;">
-      <h2 id="pb-modal-title" style="margin-bottom:0;"><i class="ti ti-route"></i> Playbooks</h2>
-      <button class="pb-mini-btn" style="margin-top:10px;" onclick="document.getElementById('playbook-modal').classList.remove('open')"><i class="ti ti-x"></i></button>
-    </div>
-    <div class="pb-tabs" id="pb-tabs-container" style="margin-top:10px;">
-      <button class="pb-tab active" id="pb-btn-run" onclick="switchPbTab('run')"><i class="ti ti-player-play"></i> Ejecutar</button>
-      <button class="pb-tab" id="pb-btn-create" onclick="switchPbTab('create')"><i class="ti ti-pencil"></i> Diseñador</button>
-    </div>
-
-    <!-- PESTAÑA RUN/MANAGE -->
-    <div class="pb-section active" id="pb-tab-run">
-      <div style="display:flex;gap:8px;margin-bottom:12px;">
-        <button class="btn" onclick="pbRefreshList()"><i class="ti ti-refresh"></i> Refrescar</button>
-        <button class="btn" onclick="pbImportDraft()"><i class="ti ti-file-upload"></i> Cargar Auto-Guardado</button>
-      </div>
-      <div class="playbook-list" id="pb-list"></div>
-    </div>
-
-    <!-- PESTAÑA DISEÑADOR N8N-LIKE -->
-    <div class="pb-section" id="pb-tab-create">
-      <div class="pb-flow-topbar">
-        <input class="pb-flow-input" id="pb-name" placeholder="Nombre (ej. lead_processor)" />
-        <input class="pb-flow-input" id="pb-desc" placeholder="Descripción del playbook" />
-        <div style="display:flex;gap:8px">
-          <button class="btn" onclick="pbClearCanvas()"><i class="ti ti-trash"></i> Limpiar</button>
-          <button class="btn primary" onclick="pbCreatePlaybook()"><i class="ti ti-device-floppy"></i> Desplegar</button>
-        </div>
-      </div>
-      
-      <div class="pb-flow-workbench">
-        <!-- Paleta Agentes -->
-        <div class="pb-flow-panel">
-          <div class="pb-flow-panel-head">
-            <div class="pb-flow-panel-title"><i class="ti ti-components"></i> Asistentes Disponibles</div>
-          </div>
-          <input class="pb-agent-search" placeholder="Filtrar..." oninput="pbFilterAgents(this.value)" />
-          <div class="pb-agent-palette" id="pb-agent-palette"></div>
-        </div>
-
-        <!-- Canvas -->
-        <div class="pb-flow-panel" style="flex:1;">
-          <div class="pb-flow-canvas-wrap" ondrop="pbDropCanvas(event)" ondragover="event.preventDefault()">
-            <div class="pb-flow-canvas-toolbar">
-              <button class="pb-mini-btn" onclick="pbAutoLayout()" title="Auto Ordenar"><i class="ti ti-layout-grid-add"></i></button>
-              <button class="pb-mini-btn" onclick="pbClearCanvas()" title="Borrar todo"><i class="ti ti-eraser"></i></button>
-            </div>
-            <div class="pb-flow-canvas-toolbar zoom">
-              <button class="pb-mini-btn" onclick="pbZoom(-0.2)"><i class="ti ti-zoom-out"></i></button>
-              <span class="pb-zoom-indicator" id="pb-zoom-label">100%</span>
-              <button class="pb-mini-btn" onclick="pbZoom(0.2)"><i class="ti ti-zoom-in"></i></button>
-              <button class="pb-mini-btn" onclick="pbResetView()"><i class="ti ti-focus-2"></i></button>
-            </div>
-            <div class="pb-flow-canvas" id="pb-flow-canvas" onmousedown="pbCanvasPanStart(event)">
-              <div class="pb-flow-plane" id="pb-flow-plane">
-                <svg class="pb-flow-svg" id="pb-flow-svg"></svg>
-                <div id="pb-nodes-container"></div>
-                <div class="pb-canvas-empty" id="pb-canvas-empty">
-                  <i class="ti ti-drag-drop"></i>
-                  Arrastra agentes aquí para comenzar a construir el flujo.
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Inspector / YAML -->
-        <div class="pb-flow-panel">
-          <div class="pb-flow-panel-head">
-            <div class="pb-flow-panel-title"><i class="ti ti-settings"></i> Inspector</div>
-            <span class="pb-flow-panel-sub" id="pb-ins-id"></span>
-          </div>
-          <div class="pb-inspector-body" id="pb-inspector">
-            <div class="pb-inspector-empty">Selecciona un nodo en el canvas para configurar su mensaje y opciones.</div>
-          </div>
-          <details class="pb-yaml-dock">
-            <summary><i class="ti ti-code"></i> Preview YAML</summary>
-            <pre id="pb-yaml-preview"></pre>
-          </details>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
-
-<div class="modal-overlay" id="pb-input-modal">
-  <div class="modal pb-input-dialog">
-    <div class="pb-input-head">
-      <div class="pb-input-icon"><i class="ti ti-player-play"></i></div>
-      <div>
-        <div class="pb-input-title" id="pb-input-title">Ejecutar playbook</div>
-        <div class="pb-input-subtitle" id="pb-input-subtitle">Introduce el dato de entrada que usará el playbook.</div>
-      </div>
-    </div>
-    <div class="pb-input-body">
-      <label for="pb-input-text"><span>Input del playbook</span><span>Ctrl/⌘ + Enter para ejecutar</span></label>
-      <textarea id="pb-input-text" class="pb-input-textarea" placeholder="Escribe aquí el input para el playbook..." onkeydown="pbInputKeydown(event)"></textarea>
-      <div class="pb-input-error" id="pb-input-error"></div>
-    </div>
-    <div class="pb-input-actions">
-      <button class="btn" onclick="pbInputCancel()">Cancelar</button>
-      <button class="btn primary" onclick="pbInputAccept()"><i class="ti ti-player-play"></i> Ejecutar</button>
-    </div>
-  </div>
-</div>
-
-<div class="modal-overlay" id="pb-delete-modal">
-  <div class="modal pb-delete-dialog">
-    <div class="pb-delete-head">
-      <div class="pb-delete-icon"><i class="ti ti-alert-triangle"></i></div>
-      <div>
-        <div class="pb-delete-title">Eliminar Playbook</div>
-        <div class="pb-delete-subtitle">Esta acción no se puede deshacer.</div>
-      </div>
-    </div>
-    <div class="pb-delete-name" id="pb-delete-name-display"></div>
-    <div class="pb-delete-actions">
-      <button class="btn" onclick="pbCloseDeleteModal()">Cancelar</button>
-      <button class="btn danger" onclick="pbConfirmDelete()"><i class="ti ti-trash"></i> Eliminar</button>
-    </div>
-  </div>
-</div>
-
 <div class="modal-overlay" id="modal">
   <div class="modal">
     <h2><i class="ti ti-plug"></i> Añadir agente</h2>
@@ -370,9 +244,7 @@
       <label class="perm-check">
         <input type="checkbox" id="um-perm-creator" /> Acceso a Creador de asistentes
       </label>
-      <label class="perm-check">
-        <input type="checkbox" id="um-perm-playbooks" /> Acceso a Playbooks
-      </label>
+      
       <label class="perm-check">
         <input type="checkbox" id="um-perm-workflows" /> Acceso a Workflows
       </label>
@@ -412,4 +284,5 @@
 <script src="/js/app.js"></script>
 </body>
 </html>
+
 
