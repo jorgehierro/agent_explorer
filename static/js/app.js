@@ -550,6 +550,12 @@ function switchMainTab(tab) {
   document.getElementById('tab-creator').classList.toggle('active', tab === 'creator');
   document.getElementById('tab-admin').classList.toggle('active', tab === 'admin');
   if(tab === 'admin') switchAdminTab('users');
+  if(tab === 'creator') {
+    const ports = Object.values(agents).map(a => parseInt(a.port)).filter(p => !isNaN(p));
+    const nextPort = ports.length > 0 ? Math.max(...ports) + 1 : 9001;
+    document.getElementById('ac-port').value = nextPort;
+    acSyncEnvHint();
+  }
 }
 
 function switchAdminTab(tab) {
@@ -1250,7 +1256,7 @@ async function pbConfirmDelete() {
 }
 
 // --- AGENT CREATOR ---
-function acBase() { return document.getElementById('ac-creator-url').value.trim().replace(/\/$/, ''); }
+function acBase() { return `${document.getElementById('base-url').value.trim().replace(/\/$/, '')}:9097`; }
 function acSnake(value) { return String(value || '').trim().toLowerCase().replace(/[^a-z0-9_\-\s]/g, '').replace(/[\-\s]+/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, ''); }
 function acSyncEnvHint() { const name = acSnake(document.getElementById('ac-agent-name').value); document.getElementById('ac-env-hint').value = name ? `AGENT_${name.toUpperCase()}_PORT` : ''; }
 function acToggleTools() { const enabled = document.getElementById('ac-use-tools').checked; document.getElementById('ac-tool-profile-wrap').style.display = enabled ? 'flex' : 'none'; if (enabled) acLoadToolProfiles(); }
@@ -1314,7 +1320,9 @@ function acShowFile(index) {
   if (acCurrentPreview?.planned_updates) files.push(['planned_updates.json', JSON.stringify(acCurrentPreview.planned_updates, null, 2)]); 
   if (!files[index]) return; 
   document.querySelectorAll('.ac-tab').forEach((tab, idx) => tab.classList.toggle('active', idx === index)); 
-  document.getElementById('ac-preview').textContent = `# ${files[index][0]}\n\n${files[index][1]}`; 
+  const ext = files[index][0].split('.').pop() || 'text';
+  const md = `\`\`\`${ext}\n${files[index][1]}\n\`\`\``;
+  document.getElementById('ac-preview').innerHTML = `<div class="bubble agent" style="box-shadow:none; border:none; padding:0; max-width:100%; background:transparent">${marked.parse(md)}</div>`; 
 }
 
 async function acPreviewAgent() { 

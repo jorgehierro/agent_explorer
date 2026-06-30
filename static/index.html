@@ -138,7 +138,6 @@
   <section class="ac-panel">
     <div class="ac-head"><div class="ac-title"><i class="ti ti-forms"></i> Datos del agente</div><button class="btn" onclick="acLoadToolProfiles()"><i class="ti ti-refresh"></i> Perfiles</button></div>
     <div class="ac-body">
-      <div class="ac-field"><label>Agent Creator URL</label><input id="ac-creator-url" value="http://10.139.90.120:9097" /><small>Servicio backend que crea archivos en el proyecto.</small></div>
       <div class="ac-field"><label>Nombre del agente</label><input id="ac-agent-name" placeholder="mi_nuevo_agente" oninput="acSyncEnvHint()" /><small>Usa snake_case. Ejemplo: <code>ticket_enricher</code>.</small></div>
       <div class="ac-field"><label>Descripción</label><input id="ac-description" placeholder="Describe qué hace el agente" /></div>
       <div class="ac-row"><div class="ac-field"><label>Capabilities</label><input id="ac-capabilities" value="tool_executing, reporting" /></div><div class="ac-field"><label>Puerto</label><input id="ac-port" type="number" min="1" max="65535" placeholder="9020" /></div></div>
@@ -150,7 +149,7 @@
       <div class="ac-actions"><span class="ac-status" id="ac-status">Listo</span><button class="btn" onclick="acPreviewAgent()"><i class="ti ti-eye"></i> Preview</button><button class="btn primary" onclick="acCreateAgent()"><i class="ti ti-sparkles"></i> Crear agente</button></div>
     </div>
   </section>
-  <section class="ac-panel"><div class="ac-head"><div class="ac-title"><i class="ti ti-code"></i> Preview de archivos</div></div><div class="ac-tabs" id="ac-tabs"></div><pre class="ac-preview" id="ac-preview">Pulsa Preview para ver los archivos generados.</pre></section>
+  <section class="ac-panel"><div class="ac-head"><div class="ac-title"><i class="ti ti-code"></i> Preview de archivos</div></div><div class="ac-tabs" id="ac-tabs"></div><div class="ac-preview" id="ac-preview">Pulsa Preview para ver los archivos generados.</div></section>
 </div>
 
 <!-- ADMIN PANEL -->

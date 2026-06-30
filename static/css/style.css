@@ -351,7 +351,7 @@ header h1 {
 .admin-toolbar { display: flex; justify-content: flex-end; margin-bottom: 12px; }
 
 /* CREATOR VIEW */
-.creator-view { display: none; flex: 1; overflow: hidden; padding: 14px; gap: 14px; grid-template-columns: minmax(420px, 540px) minmax(420px, 1fr); }
+.creator-view { display: none; flex: 1; overflow: hidden; padding: 14px; gap: 14px; grid-template-columns: 360px 1fr; }
 .creator-view.active { display: grid; }
 .ac-panel { background: var(--surface); border: .5px solid var(--border); border-radius: var(--radius-lg); display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
 .ac-head { padding: 12px 14px; border-bottom: .5px solid var(--border); background: var(--surface2); display: flex; align-items: center; justify-content: space-between; gap: 10px; }
@@ -370,7 +370,7 @@ header h1 {
 .ac-tabs { display: flex; gap: 6px; padding: 10px; background: var(--surface2); border-bottom: .5px solid var(--border); overflow: auto; }
 .ac-tab { padding: 6px 12px; border: .5px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--text2); cursor: pointer; font-size: 12px; white-space: nowrap; transition: all var(--transition-fast); }
 .ac-tab.active { background: var(--blue-bg); color: var(--blue-text); border-color: var(--blue-border); }
-.ac-preview { margin: 0; padding: 16px; white-space: pre; overflow: auto; font-family: 'Courier New', monospace; font-size: 12px; line-height: 1.6; color: var(--text2); height: 100%; }
+.ac-preview { margin: 0; padding: 16px; overflow: auto; height: 100%; }
 
 /* === PLAYBOOK BUILDER (N8N-LIKE) === */
 .pb-flow-modal { display:flex; flex-direction:column; padding:0; }
