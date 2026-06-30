@@ -607,7 +607,6 @@ function openUserModal() {
   document.getElementById('um-password').value = '';
   document.getElementById('um-role').value = 'user';
   document.getElementById('um-perm-creator').checked = false;
-  document.getElementById('um-perm-playbooks').checked = false;
   document.getElementById('um-perm-workflows').checked = false;
   populateAgentCheckboxes('*');
   document.getElementById('um-active').checked = true;
@@ -629,7 +628,6 @@ function editUser(id) {
       
       const p = u.permissions || { tabs: [], agents: '*' };
       document.getElementById('um-perm-creator').checked = p.tabs.includes('creator');
-      document.getElementById('um-perm-playbooks').checked = p.tabs.includes('playbooks');
       document.getElementById('um-perm-workflows').checked = p.tabs.includes('workflows');
       populateAgentCheckboxes(p.agents || '*');
       
@@ -649,7 +647,6 @@ async function saveUser() {
   
   const tabs = [];
   if (document.getElementById('um-perm-creator').checked) tabs.push('creator');
-  if (document.getElementById('um-perm-playbooks').checked) tabs.push('playbooks');
   if (document.getElementById('um-perm-workflows').checked) tabs.push('workflows');
   
   let agentsPerm = '*';
