@@ -540,4 +540,6 @@ header h1 {
 .perm-agent-pill:hover { border-color: var(--blue-border); }
 .perm-agent-pill:has(input[type="checkbox"]:checked) { background: color-mix(in srgb, var(--blue-bg) 15%, transparent); border-color: var(--blue-border); color: var(--blue-text); }
 .perm-agent-pill input[type="checkbox"] { display: none; }
-
+.perm-agent-pill .icon-selected { display: none; }
+.perm-agent-pill:has(input[type="checkbox"]:checked) .icon-unselected { display: none; }
+.perm-agent-pill:has(input[type="checkbox"]:checked) .icon-selected { display: inline-block; }

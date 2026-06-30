@@ -685,7 +685,7 @@ function populateAgentCheckboxes(agentsStr) {
   const allAgents = Object.keys(agents);
   let html = `<label class="perm-agent-pill">
     <input type="checkbox" id="um-perm-agent-all" value="*" onchange="toggleAllAgents(this)" ${agentsStr === '*' ? 'checked' : ''} />
-    <i class="ti ti-star"></i> Todos (*)
+    <i class="ti ti-star icon-unselected"></i><i class="ti ti-check icon-selected"></i> Todos (*)
   </label>`;
   
   if (allAgents.length === 0) {
@@ -696,7 +696,7 @@ function populateAgentCheckboxes(agentsStr) {
       const isChecked = agentsStr === '*' || allowed.includes(a);
       html += `<label class="perm-agent-pill">
         <input type="checkbox" class="um-perm-agent-cb" value="${escapeHtml(a)}" ${isChecked ? 'checked' : ''} onchange="updateAllAgentsCheckbox()" />
-        <i class="ti ti-robot"></i> ${escapeHtml(a)}
+        <i class="ti ti-robot icon-unselected"></i><i class="ti ti-check icon-selected"></i> ${escapeHtml(a)}
       </label>`;
     });
   }
