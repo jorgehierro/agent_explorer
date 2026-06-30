@@ -72,14 +72,20 @@
 
 <div class="main" id="explorer-view">
   <div class="sidebar">
-    <div class="sidebar-header">
-      <span>Agentes</span>
-      <span id="agent-count" style="font-size:11px;color:var(--text3)"></span>
+    <div class="sidebar-tabs">
+      <div class="sidebar-tab active" onclick="switchSidebarTab('agents')" id="st-agents">Agentes <span id="agent-count"></span></div>
+      <div class="sidebar-tab" onclick="switchSidebarTab('automations')" id="st-automations">Autos <span id="auto-count"></span></div>
     </div>
     <div class="agents-list" id="agents-list">
       <div class="empty-state">
         <i class="ti ti-router"></i>
         <p>Introduce la URL base y los puertos, luego pulsa <strong>Descubrir</strong>.</p>
+      </div>
+    </div>
+    <div class="agents-list" id="automations-list" style="display:none">
+      <div class="empty-state">
+        <i class="ti ti-list-check"></i>
+        <p>No hay automatizaciones disponibles.</p>
       </div>
     </div>
     <div class="sidebar-footer">

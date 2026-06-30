@@ -241,27 +241,17 @@ async function discoverAgents() {
   }
 
   agents = {};
-  const ports = Array.from({ length: to - from + 1 }, (_, i) => from + i).filter(port => port !== 9097);
-  
   try {
-    const results = await Promise.all(ports.map(async port => {
-      const url = `${base}:${port}`;
-      try {
-        const r = await fetch(`${url}/.well-known/agent.json`, { signal: AbortSignal.timeout(3000) });
-        if (!r.ok) return { name: null, url, port, ok: false };
-        const card = await r.json();
-        return { name: card.name || `agente-${port}`, url, port, ok: true, card };
-      } catch {
-        return { name: null, url, port, ok: false };
-      }
-    }));
-    
-    results.forEach(({ name, url, port, ok, card }) => {
-      if (ok && name) agents[name] = { url, port, ok, card };
+    const r = await fetch('/api/proxy/discover', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({base_url: base, port_from: from, port_to: to})
     });
-  } catch(e) { 
-    console.error("Discovery error", e); 
-  }
+    if(r.ok) {
+      const data = await r.json();
+      data.agents.forEach(a => { agents[a.name] = a; });
+    }
+  } catch(e) { console.error("Discovery error", e); }
 
   btn.disabled = false;
   btn.innerHTML = '<i class="ti ti-radar"></i> Descubrir';
@@ -272,8 +262,26 @@ async function discoverAgents() {
   if (selected) addSystemMsg(`Escaneados puertos — ${found} agente${found !== 1 ? 's' : ''} encontrado${found !== 1 ? 's' : ''}`);
 }
 
+let currentSidebarTab = 'agents';
+
+function switchSidebarTab(tab) {
+  currentSidebarTab = tab;
+  document.getElementById('st-agents').classList.toggle('active', tab === 'agents');
+  document.getElementById('st-automations').classList.toggle('active', tab === 'automations');
+  document.getElementById('agents-list').style.display = (tab === 'agents') ? 'block' : 'none';
+  document.getElementById('automations-list').style.display = (tab === 'automations') ? 'block' : 'none';
+}
+
+function getAgentKind(name) {
+  const cardName = agents[name]?.card?.name || name || '';
+  if (cardName === 'workflow_runner') return 'workflow';
+  if (cardName === 'playbook_runner') return 'playbook';
+  return 'generic';
+}
+
 function renderSidebar() {
-  const list = document.getElementById('agents-list');
+  const agentsListEl = document.getElementById('agents-list');
+  const automationsListEl = document.getElementById('automations-list');
   let names = Object.keys(agents);
   
   const perms = currentUser?.permissions || { tabs: [], agents: '*' };
@@ -289,33 +297,51 @@ function renderSidebar() {
     return portA - portB;
   });
   
-  document.getElementById('agent-count').textContent = names.length ? `${names.length}` : '';
+  const genericAgents = names.filter(n => getAgentKind(n) === 'generic');
+  const automationAgents = names.filter(n => getAgentKind(n) !== 'generic');
 
-  if (!names.length) {
-    list.innerHTML = `<div class="empty-state">
+  document.getElementById('agent-count').textContent = genericAgents.length ? `(${genericAgents.length})` : '';
+  document.getElementById('auto-count').textContent = automationAgents.length ? `(${automationAgents.length})` : '';
+
+  if (!genericAgents.length) {
+    agentsListEl.innerHTML = `<div class="empty-state">
       <i class="ti ti-router"></i>
       <p>Introduce la URL base y los puertos, luego pulsa <strong>Descubrir</strong>.</p>
     </div>`;
-    return;
+  } else {
+    agentsListEl.innerHTML = genericAgents.map(name => {
+      const a = agents[name];
+      const active = selected === name ? 'active' : '';
+      const status = a.ok ? 'ok' : 'err';
+      return `<div class="agent-item ${active} ${status}" onclick="selectAgent('${name}')">
+        <span class="dot"></span>
+        <span class="name">${name}</span>
+        <span class="port-tag">:${a.port}</span>
+      </div>`;
+    }).join('');
   }
 
-  list.innerHTML = names.map(name => {
-    const a = agents[name];
-    const active = selected === name ? 'active' : '';
-    const status = a.ok ? 'ok' : 'err';
-    return `<div class="agent-item ${active} ${status}" onclick="selectAgent('${name}')">
-      <span class="dot"></span>
-      <span class="name">${name}</span>
-      <span class="port-tag">:${a.port}</span>
+  if (!automationAgents.length) {
+    automationsListEl.innerHTML = `<div class="empty-state">
+      <i class="ti ti-list-check"></i>
+      <p>No hay automatizaciones disponibles.</p>
     </div>`;
-  }).join('');
+  } else {
+    automationsListEl.innerHTML = automationAgents.map(name => {
+      const a = agents[name];
+      const active = selected === name ? 'active' : '';
+      const status = a.ok ? 'ok' : 'err';
+      return `<div class="agent-item ${active} ${status}" onclick="selectAgent('${name}')">
+        <span class="dot"></span>
+        <span class="name">${name}</span>
+        <span class="port-tag">:${a.port}</span>
+      </div>`;
+    }).join('');
+  }
 }
 
 function selectedAgentKind() {
-  const cardName = agents[selected]?.card?.name || selected || '';
-  if (cardName === 'workflow_runner') return 'workflow';
-  if (cardName === 'playbook_runner') return 'playbook';
-  return 'generic';
+  return getAgentKind(selected);
 }
 
 function updateAutomationButtonForSelectedAgent() {

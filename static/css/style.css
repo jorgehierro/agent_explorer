@@ -138,18 +138,27 @@ header h1 {
   flex-direction: column;
   overflow: hidden;
 }
-.sidebar-header {
-  padding: 12px 14px 8px;
+.sidebar-tabs {
+  display: flex;
+  border-bottom: 0.5px solid var(--border);
+  background: var(--surface2);
+}
+.sidebar-tab {
+  flex: 1;
+  text-align: center;
+  padding: 10px 0;
   font-size: 11px;
   font-weight: 500;
   color: var(--text3);
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  border-bottom: 0.5px solid var(--border);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  border-bottom: 1.5px solid transparent;
+  transition: all var(--transition-fast);
 }
+.sidebar-tab:hover { color: var(--text2); }
+.sidebar-tab.active { color: var(--blue-text); border-bottom-color: var(--blue-border); background: var(--surface); }
+
 .agents-list {
   flex: 1;
   overflow-y: auto;
